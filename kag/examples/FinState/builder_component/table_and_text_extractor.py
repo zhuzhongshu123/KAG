@@ -10,6 +10,7 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied.
 
+import os
 import json
 import copy
 import logging
@@ -171,6 +172,9 @@ class TableAndTextExtractor(ExtractorABC):
             table_context_str = table_chunk.name + "\n" + table_chunk.kwargs["context"]
         else:
             table_context_str = table_chunk.name + "\n" + table_chunk.content
+        if hasattr(table_chunk, "parent_id"):
+            parent_id = os.path.basename(table_chunk.parent_id)
+            table_context_str = parent_id + "\n" + table_context_str
         if len(table_context_str) <= 0:
             return None
         return table_context_str
@@ -249,8 +253,8 @@ class TableAndTextExtractor(ExtractorABC):
         # 调用ner进行实体识别
         table_chunks = self.split_table(input_table, 500)
         for c in table_chunks:
-            subgraph_lsit = self.schema_free_extractor.invoke(input=c)
-            rst.extend(subgraph_lsit)
+            subgraph_list = self.schema_free_extractor.invoke(input=c)
+            rst.extend(subgraph_list)
         return rst
 
     def _extract_other_table(self, input_table: Chunk):
