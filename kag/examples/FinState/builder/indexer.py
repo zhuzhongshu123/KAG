@@ -31,7 +31,7 @@ def buildKB(file_path):
 
 
 if __name__ == "__main__":
-    import_modules_from_path("/Users/youdonghai/code/KAG_ant/dep/KAG/kag/examples/FinState/component")
+    import_modules_from_path("/Users/youdonghai/code/KAG_ant/dep/KAG/kag/examples/FinState/builder_component")
     dir_path = os.path.dirname(__file__)
     file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告.md")
 

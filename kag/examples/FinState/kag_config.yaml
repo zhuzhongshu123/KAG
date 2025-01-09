@@ -43,6 +43,14 @@ kag_builder_pipeline:
         type: default_std # kag.builder.prompt.default.std.OpenIEEntitystandardizationdPrompt
       triple_prompt:
         type: default_triple # kag.builder.prompt.default.triple.OpenIETriplePrompt
+      table_classify_prompt:
+        type: table_classify
+      table_context_prompt:
+        type: table_context
+      table_keywords_prompt:
+        type: table_keywords
+      table_reformat_prompt:
+        type: table_reformat
     reader:
       type: md_reader # kag.builder.component.reader.dict_reader.DictReader
     post_processor:
