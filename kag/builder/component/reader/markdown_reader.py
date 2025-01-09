@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup, Tag
 import logging
 import re
 import requests
+import pandas as pd
 from typing import List, Dict
 
 
@@ -180,25 +181,46 @@ class MarkDownReader(ReaderABC):
                         current_content.append(f"* {text}")
 
             elif element.name == "table":
-                # Process table
-                table_data = []
-                headers = []
+                # Process table directly using pandas
+                table_html = str(element)
+                df = pd.read_html(table_html)[0]  # read_html returns a list of DataFrames
+                headers = df.columns.tolist()
 
-                if element.find("thead"):
-                    for th in element.find("thead").find_all("th"):
-                        headers.append(th.get_text().strip())
+                # Capture table context (text before and after the table)
+                table_context = {
+                    "before_text": "",
+                    "after_text": ""
+                }
+                
+                # Get text before table
+                prev_texts = []
+                prev_element = element.find_previous_sibling()
+                while prev_element:
+                    if prev_element.name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+                        break
+                    if prev_element.name == "p":
+                        prev_texts.insert(0, process_text_with_links(prev_element))
+                    prev_element = prev_element.find_previous_sibling()
+                table_context["before_text"] = "\n".join(prev_texts) if prev_texts else ""
 
-                if element.find("tbody"):
-                    for row in element.find("tbody").find_all("tr"):
-                        row_data = {}
-                        for i, td in enumerate(row.find_all("td")):
-                            if i < len(headers):
-                                row_data[headers[i]] = td.get_text().strip()
-                        table_data.append(row_data)
+                # Get text after table
+                next_texts = []
+                next_element = element.find_next_sibling()
+                while next_element:
+                    if next_element.name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+                        break
+                    if next_element.name == "p":
+                        next_texts.append(process_text_with_links(next_element))
+                    next_element = next_element.find_next_sibling()
+                table_context["after_text"] = "\n".join(next_texts) if next_texts else ""
 
-                # Add table to current node
+                # Add table to current node with context
                 if stack[-1].title != "root":
-                    stack[-1].tables.append({"headers": headers, "data": table_data})
+                    stack[-1].tables.append({
+                        "headers": headers, 
+                        "data": df,
+                        "context": table_context
+                    })
 
             elif element.name == "p":
                 text = process_text_with_links(element)  # Process links in paragraphs
@@ -223,23 +245,9 @@ class MarkDownReader(ReaderABC):
     ) -> List[Output]:
         def convert_table_to_markdown(headers, data):
             """Convert table data to markdown format"""
-            if not headers or not data:
+            if not headers or data.empty:
                 return ""
-
-            # Build header row
-            header_row = " | ".join(headers)
-            # Build separator row
-            separator = " | ".join(["---"] * len(headers))
-            # Build data rows
-            data_rows = []
-            for row in data:
-                row_values = [str(row.get(header, "")) for header in headers]
-                data_rows.append(" | ".join(row_values))
-
-            # Combine all rows
-            table_md = f"\n| {header_row} |\n| {separator} |\n"
-            table_md += "\n".join(f"| {row} |" for row in data_rows)
-            return table_md + "\n"
+            return "\n" + data.to_markdown(index=False) + "\n"
 
         def collect_tables(n: MarkdownNode):
             """Collect tables from node and its children"""
@@ -306,7 +314,11 @@ class MarkDownReader(ReaderABC):
                         name=f"{full_title} / Table {i+1}",
                         content=table_content,
                         type=ChunkTypeEnum.Table,
-                        metadata={"table_data": table}
+                        metadata={
+                            "table_data": table,
+                            "before_text": table.get("context", {}).get("before_text", ""),
+                            "after_text": table.get("context", {}).get("after_text", "")
+                        }
                     )
                     outputs.append(table_chunk)
                     all_tables.append(table)
@@ -321,7 +333,11 @@ class MarkDownReader(ReaderABC):
                         name=f"{full_title} / Table {i+1}",
                         content=table_content,
                         type=ChunkTypeEnum.Table,
-                        metadata={"table_data": table}
+                        metadata={
+                            "table_data": table,
+                            "before_text": table.get("context", {}).get("before_text", ""),
+                            "after_text": table.get("context", {}).get("after_text", "")
+                        }
                     )
                     outputs.append(table_chunk)
                     all_tables.append(table)
@@ -370,7 +386,11 @@ class MarkDownReader(ReaderABC):
                             name=f"{full_title} / Table {i+1}",
                             content=table_content,
                             type=ChunkTypeEnum.Table,
-                            metadata={"table_data": table}
+                            metadata={
+                                "table_data": table,
+                                "before_text": table.get("context", {}).get("before_text", ""),
+                                "after_text": table.get("context", {}).get("after_text", "")
+                            }
                         )
                         outputs.append(table_chunk)
                         all_tables.append(table)
@@ -385,7 +405,11 @@ class MarkDownReader(ReaderABC):
                             name=f"{full_title} / Table {i+1}",
                             content=table_content,
                             type=ChunkTypeEnum.Table,
-                            metadata={"table_data": table}
+                            metadata={
+                                "table_data": table,
+                                "before_text": table.get("context", {}).get("before_text", ""),
+                                "after_text": table.get("context", {}).get("after_text", "")
+                            }
                         )
                         outputs.append(table_chunk)
                         all_tables.append(table)
