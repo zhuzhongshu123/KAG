@@ -185,6 +185,8 @@ class MarkDownReader(ReaderABC):
                 # Process table directly using pandas
                 table_html = str(element)
                 df = pd.read_html(io.StringIO(table_html), header=0)[0]  # read_html returns a list of DataFrames
+                # Replace 'Unnamed' headers with empty string
+                df.columns = ['' if 'Unnamed' in str(col) else col for col in df.columns]
                 headers = df.columns.tolist()
 
                 # Capture table context (text before and after the table)
