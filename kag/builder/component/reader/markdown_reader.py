@@ -11,6 +11,7 @@
 # or implied.
 
 import os
+import io
 
 import markdown
 from bs4 import BeautifulSoup, Tag
@@ -183,7 +184,7 @@ class MarkDownReader(ReaderABC):
             elif element.name == "table":
                 # Process table directly using pandas
                 table_html = str(element)
-                df = pd.read_html(table_html)[0]  # read_html returns a list of DataFrames
+                df = pd.read_html(io.StringIO(table_html), header=0)[0]  # read_html returns a list of DataFrames
                 headers = df.columns.tolist()
 
                 # Capture table context (text before and after the table)
@@ -247,6 +248,9 @@ class MarkDownReader(ReaderABC):
             """Convert table data to markdown format"""
             if not headers or data.empty:
                 return ""
+            data:pd.DataFrame = data
+            data = data.fillna("")
+            data = data.astype(str)
             return "\n" + data.to_markdown(index=False) + "\n"
 
         def collect_tables(n: MarkdownNode):
