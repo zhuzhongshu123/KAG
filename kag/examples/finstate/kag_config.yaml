@@ -27,7 +27,7 @@ project:
   host_addr: http://127.0.0.1:8887
   id: '1'
   language: en
-  namespace: FinState
+  namespace: finstate
 #------------project configuration end----------------#
 
 #------------kag-builder configuration start----------------#
@@ -97,7 +97,7 @@ kag_solver_pipeline:
     llm_client: *chat_llm
   max_iterations: 3
   reasoner:
-    type: default_reasoner # kag.solver.implementation.default_reasoner.DefaultReasoner
+    type: table_reasoner # kag.solver.implementation.default_reasoner.DefaultReasoner
     llm_client: *chat_llm
     lf_planner:
       type: default_lf_planner # kag.solver.plan.default_lf_planner.DefaultLFPlanner
