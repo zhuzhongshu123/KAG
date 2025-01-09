@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup, Tag
 import logging
 import re
 import requests
+import pandas as pd
 from typing import List, Dict
 
 
@@ -180,21 +181,11 @@ class MarkDownReader(ReaderABC):
                         current_content.append(f"* {text}")
 
             elif element.name == "table":
-                # Process table
-                table_data = []
-                headers = []
-
-                if element.find("thead"):
-                    for th in element.find("thead").find_all("th"):
-                        headers.append(th.get_text().strip())
-
-                if element.find("tbody"):
-                    for row in element.find("tbody").find_all("tr"):
-                        row_data = {}
-                        for i, td in enumerate(row.find_all("td")):
-                            if i < len(headers):
-                                row_data[headers[i]] = td.get_text().strip()
-                        table_data.append(row_data)
+                # Process table directly using pandas
+                table_html = str(element)
+                df = pd.read_html(table_html)[0]  # read_html returns a list of DataFrames
+                headers = df.columns.tolist()
+                table_data = df.to_dict('records')
 
                 # Add table to current node
                 if stack[-1].title != "root":
