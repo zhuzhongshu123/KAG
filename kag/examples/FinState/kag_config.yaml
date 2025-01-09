@@ -26,7 +26,7 @@ project:
   biz_scene: table
   host_addr: http://127.0.0.1:8887
   id: '1'
-  language: en
+  language: zh
   namespace: FinState
 #------------project configuration end----------------#
 
@@ -35,7 +35,7 @@ kag_builder_pipeline:
   chain:
     type: unstructured_builder_chain # kag.builder.default_chain.DefaultUnstructuredBuilderChain
     extractor:
-      type: schema_free_extractor # kag.builder.component.extractor.schema_free_extractor.SchemaFreeExtractor
+      type: table_and_text_extractor # kag.builder.component.extractor.schema_free_extractor.SchemaFreeExtractor
       llm: *openie_llm
       ner_prompt:
         type: default_ner # kag.builder.prompt.default.ner.OpenIENERPrompt
@@ -44,7 +44,7 @@ kag_builder_pipeline:
       triple_prompt:
         type: default_triple # kag.builder.prompt.default.triple.OpenIETriplePrompt
     reader:
-      type: dict_reader # kag.builder.component.reader.dict_reader.DictReader
+      type: md_reader # kag.builder.component.reader.dict_reader.DictReader
     post_processor:
       type: kag_post_processor # kag.builder.component.postprocessor.kag_postprocessor.KAGPostProcessor
       similarity_threshold: 0.9
@@ -57,10 +57,10 @@ kag_builder_pipeline:
       vectorize_model: *vectorize_model
     writer:
       type: kg_writer # kag.builder.component.writer.kg_writer.KGWriter
-  num_threads_per_chain: 1
-  num_chains: 16
+  num_threads_per_chain: 10
+  num_chains: 1
   scanner:
-    type: hotpotqa_dataset_scanner # kag.builder.component.scanner.dataset_scanner.HotpotqaCorpusScanner
+    type: file_scanner # kag.builder.component.scanner.dataset_scanner.HotpotqaCorpusScanner
 #------------kag-builder configuration end----------------#
 
 #------------kag-solver configuration start----------------#

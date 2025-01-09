@@ -8,3 +8,31 @@
 # Unless required by applicable law or agreed to in writing, software distributed under the License
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied.
+
+
+import os
+import logging
+from kag.common.registry import import_modules_from_path
+
+from kag.builder.runner import BuilderChainRunner
+
+logger = logging.getLogger(__name__)
+
+
+def buildKB(file_path):
+    from kag.common.conf import KAG_CONFIG
+
+    runner = BuilderChainRunner.from_config(
+        KAG_CONFIG.all_config["kag_builder_pipeline"]
+    )
+    runner.invoke(file_path)
+
+    logger.info(f"\n\nbuildKB successfully for {file_path}\n\n")
+
+
+if __name__ == "__main__":
+    import_modules_from_path("/Users/youdonghai/code/KAG_ant/dep/KAG/kag/examples/FinState/component")
+    dir_path = os.path.dirname(__file__)
+    file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告.md")
+
+    buildKB(file_path)
