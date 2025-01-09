@@ -64,7 +64,7 @@ class TableRetrievalAgent(ChunkRetrieverABC):
         self.vectorizer: Vectorizer = Vectorizer.from_config(vectorizer_config)
         self.text_similarity = TextSimilarity(vec_config=vectorizer_config)
         self.fuzzy_match = FuzzyMatchRetrievalSpo(
-            text_similarity=self.text_similarity, llm=self.llm_module, KAG_PROMPT_BIZ_SCENE='finstate'
+            text_similarity=self.text_similarity, llm=self.llm_module, KAG_PROMPT_BIZ_SCENE='FinState'
         )
 
         self.graph_api: OpenSPGGraphApi = OpenSPGGraphApi(

@@ -4,11 +4,12 @@ from typing import List
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from kag.examples.finstate.solver.impl.chunk_lf_planner import ChunkLFPlanner
-from kag.examples.finstate.solver.impl.spo_generator import SPOGenerator
-from kag.examples.finstate.solver.impl.spo_lf_planner import SPOLFPlanner
-from kag.examples.finstate.solver.impl.spo_memory import SpoMemory
-from kag.examples.finstate.solver.impl.spo_reflector import SPOReflector
+from kag.examples.FinState.solver.impl.chunk_lf_planner import ChunkLFPlanner
+from kag.examples.FinState.solver.impl.spo_generator import SPOGenerator
+from kag.examples.FinState.solver.impl.spo_lf_planner import SPOLFPlanner
+from kag.examples.FinState.solver.impl.spo_memory import SpoMemory
+from kag.examples.FinState.solver.impl.spo_reflector import SPOReflector
+from kag.interface.solver.base_model import LFExecuteResult
 from kag.interface.solver.kag_reasoner_abc import KagReasonerABC
 from kag.interface.solver.plan.lf_planner_abc import LFPlannerABC
 from kag.solver.implementation.default_reasoner import DefaultReasoner
@@ -48,7 +49,7 @@ class TableReasoner(KagReasonerABC):
             "report_tool", None
         )
 
-    def reason(self, question: str):
+    def reason(self, question: str, **kwargs) -> LFExecuteResult:
         """
         Processes a given question by planning and executing logical forms to derive an answer.
         Parameters:
