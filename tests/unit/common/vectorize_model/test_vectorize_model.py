@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import copy
 import pytest
+
+from kag.builder.component.vectorizer.batch_vectorizer import BatchVectorizer
 from kag.interface import VectorizeModelABC
 
 
@@ -8,13 +10,13 @@ from kag.interface import VectorizeModelABC
 def test_openai_vectorize_model():
 
     conf = {
+        "api_key": "sk - yndixxjfxvnsqfkvfuyubkxidhtwicjcflprvqguffrmxbrv",
+        "base_url": "https://api.siliconflow.cn/v1/",
+        "model": "BAAI / bge - m3",
         "type": "openai",
-        "model": "bge-m3",
-        "api_key": "EMPTY",
-        "base_url": "http://127.0.0.1:11434/v1",
-        "vector_dimensions": 1024,
+        "vector_dimensions": "1024",
     }
-    vectorize_model = VectorizeModelABC.from_config(copy.deepcopy(conf))
+    vectorize_model = BatchVectorizer.from_config(copy.deepcopy(conf))
     res = vectorize_model.vectorize("你好")
     assert res is not None
 
@@ -67,3 +69,8 @@ def test_mock_vectorize_model():
     assert len(embs) == 2
     for emb in embs:
         assert len(emb) == vectorize_model.get_vector_dimensions()
+
+
+if __name__ == "__main__":
+    res = test_openai_vectorize_model()
+    print(res)

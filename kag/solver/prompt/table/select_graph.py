@@ -8,7 +8,7 @@ from kag.interface.common.prompt import PromptABC
 logger = logging.getLogger(__name__)
 
 @PromptABC.register("select_graph")
-class SelectDocsPrompt(PromptABC):
+class SelectGraphPrompt(PromptABC):
     template_zh = """
 # instruction
 基于给定的信息和图查询结果，选择与问题最相关的实体name。

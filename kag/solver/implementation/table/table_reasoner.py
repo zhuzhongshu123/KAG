@@ -3,26 +3,30 @@ import time
 from typing import List
 import logging
 from concurrent.futures import ThreadPoolExecutor
-
-from kag.examples.FinState.solver.impl.chunk_lf_planner import ChunkLFPlanner
-from kag.examples.FinState.solver.impl.spo_generator import SPOGenerator
-from kag.examples.FinState.solver.impl.spo_lf_planner import SPOLFPlanner
-from kag.examples.FinState.solver.impl.spo_memory import SpoMemory
-from kag.examples.FinState.solver.impl.spo_reflector import SPOReflector
-from kag.interface.solver.base_model import LFExecuteResult
 from kag.interface.solver.kag_reasoner_abc import KagReasonerABC
 from kag.interface.solver.plan.lf_planner_abc import LFPlannerABC
-from kag.solver.implementation.default_reasoner import DefaultReasoner
 from kag.solver.implementation.table.search_tree import SearchTree, SearchTreeNode
 from kag.interface.common.llm_client import LLMClient
 from kag.interface.common.prompt import PromptABC
 from kag.solver.implementation.table.retrieval_agent import TableRetrievalAgent
-from kag.solver.logic.solver_pipeline import SolverPipeline
 from kag.solver.tools.info_processor import ReporterIntermediateProcessTool
 from kag.solver.implementation.table.python_coder import PythonCoderAgent
-
+from kag.solver.prompt.table.logic_form_plan_table import LogicFormPlanPrompt
+from kag.solver.prompt.table.resp_with_dk_generator import RespGenerator
+from kag.solver.prompt.table.llm_backup import RespGenerator
+from kag.solver.prompt.table.resp_think_generator import RethinkRespGenerator
+from kag.solver.prompt.default.resp_judge import RespJudge
+from kag.solver.prompt.table.rewrite_sub_question import RewriteSubQuestionPrompt
 logger = logging.getLogger()
-
+llm_config = {
+            "type": "ant_deepseek",
+            "model": "deepseek-chat",
+            "key": "gs540iivzezmidi3",
+            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
+            "visitDomain": "BU_altas",
+            "visitBiz": "BU_altas_tianchang",
+            "visitBizLine": "BU_altas_tianchang_line",
+        }
 @KagReasonerABC.register("table_reasoner")
 class TableReasoner(KagReasonerABC):
     """
@@ -39,17 +43,23 @@ class TableReasoner(KagReasonerABC):
         self.kwargs = kwargs
         self.session_id = kwargs.get("session_id", 0)
         self.dk = self._query_dk()
-        self.logic_form_plan_prompt = PromptABC.from_config({"type": "logic_form_plan_table"})
-        self.resp_generator = PromptABC.from_config({"type": "resp_with_dk_generator"})
-        self.llm_backup = PromptABC.from_config({"type": "llm_backup"})
-        self.resp_think_generator = PromptABC.from_config({"type": "resp_think_generator"})
-        self.judge_prompt = PromptABC.from_config({"type": "default_resp_judge"})
-        self.rewrite_subquestion = PromptABC.from_config({"type": "rewrite_sub_question"})
+        # self.logic_form_plan_prompt = PromptABC.from_config({"type": "logic_form_plan_table"})
+        self.logic_form_plan_prompt = LogicFormPlanPrompt(language=self.language)
+        # self.resp_generator = PromptABC.from_config({"type": "resp_with_dk_generator"})
+        self.resp_generator = RespGenerator(language=self.language)
+        # self.llm_backup = PromptABC.from_config({"type": "llm_backup"})
+        self.llm_backup = RespGenerator(language=self.language)
+        # self.resp_think_generator = PromptABC.from_config({"type": "resp_think_generator"})
+        self.resp_think_generator = RethinkRespGenerator(language=self.language)
+        # self.judge_prompt = PromptABC.from_config({"type": "default_resp_judge"})
+        self.judge_prompt = RespJudge(language=self.language)
+        # self.rewrite_subquestion = PromptABC.from_config({"type": "rewrite_sub_question"})
+        self.rewrite_subquestion = RewriteSubQuestionPrompt(language=self.language)
         self.report_tool: ReporterIntermediateProcessTool = kwargs.get(
             "report_tool", None
         )
 
-    def reason(self, question: str, **kwargs) -> LFExecuteResult:
+    def reason(self, question: str, **kwargs):
         """
         Processes a given question by planning and executing logical forms to derive an answer.
         Parameters:
@@ -150,20 +160,12 @@ class TableReasoner(KagReasonerABC):
             self.judge_prompt,
             with_json_parse=True,
         )
-        llm_config = {
-            "type": "ant_deepseek",
-            "model": "deepseek-chat",
-            "key": "",
-            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
-            "visitDomain": "BU_altas",
-            "visitBiz": "BU_altas_tianchang",
-            "visitBizLine": "BU_altas_tianchang_line",
-        }
-        llm: LLMClient = LLMClient.from_config(llm_config)
+
+        # llm: LLMClient = LLMClient.from_config(llm_config)
         if can_answer:
             final_answer_form_llm = False
             # 总结答案
-            final_answer = llm.invoke(
+            final_answer = self.llm_module.invoke(
                 {
                     "memory": str(history),
                     "question": history.root_node.question,
@@ -175,7 +177,7 @@ class TableReasoner(KagReasonerABC):
         else:
             # 无法直接给出答案，则给出用户关心的信息
             final_answer_form_llm = False
-            final_answer = llm.invoke(
+            final_answer = self.llm_module.invoke(
                 {
                     "memory": str(history),
                     "question": history.root_node.question,
@@ -188,16 +190,7 @@ class TableReasoner(KagReasonerABC):
         return final_answer
 
     def _get_sub_question_list(self, history: SearchTree, kg_content: str):
-        llm_config = {
-            "type": "ant_deepseek",
-            "model": "deepseek-chat",
-            "key": "",
-            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
-            "visitDomain": "BU_altas",
-            "visitBiz": "BU_altas_tianchang",
-            "visitBizLine": "BU_altas_tianchang_line",
-        }
-        llm: LLMClient = LLMClient.from_config(llm_config)
+        # llm: LLMClient = LLMClient.from_config(llm_config)
         history_str = None
         if history.now_plan is not None:
             history.set_now_plan(None)
@@ -208,7 +201,8 @@ class TableReasoner(KagReasonerABC):
             "history": history_str,
             "dk": history.dk,
         }
-        sub_question_list = llm.invoke(
+        # import pdb; pdb.set_trace()
+        sub_question_list = self.llm_module.invoke(
             variables=variables,
             prompt_op=self.logic_form_plan_prompt,
             with_except=True,
@@ -290,7 +284,7 @@ class TableReasoner(KagReasonerABC):
             # 同时进行chunk求解
             futures = [
                 executor.submit(table_retrical_agent.answer, history=history),
-                executor.submit(self._call_spo_retravel_func, self._get_subquestion_pre(history) + node.question),
+                # executor.submit(self._call_spo_retravel_func, self._get_subquestion_pre(history) + node.question),
             ]
             for i, future in enumerate(futures):
                 if 0 == i:

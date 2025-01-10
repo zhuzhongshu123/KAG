@@ -20,7 +20,6 @@ from typing import Union, Optional
 
 from knext.project.client import ProjectClient
 
-
 class KAGConstants(object):
     LOCAL_SCHEMA_URL = "http://localhost:8887"
     DEFAULT_KAG_CONFIG_FILE_NAME = "default_config.yaml"

@@ -6,10 +6,13 @@ openie_llm: &openie_llm
   type: maas
 
 chat_llm: &chat_llm
-  api_key: sk-4323e7aaab36449fab52b0ed86e29696
-  base_url: https://api.deepseek.com
-  model: deepseek-chat
-  type: maas
+            type: ant_deepseek
+            model: deepseek-chat
+            key: gs540iivzezmidi3
+            url: https://zdfmng.alipay.com/commonQuery/queryData
+            visitDomain: BU_altas
+            visitBiz: BU_altas_tianchang
+            visitBizLine: BU_altas_tianchang_line
 
 vectorize_model: &vectorize_model
   api_key: sk-yndixxjfxvnsqfkvfuyubkxidhtwicjcflprvqguffrmxbrv
@@ -98,6 +101,11 @@ chunk_retriever: &chunk_retriever
   llm_client: *chat_llm
   recall_num: 10
   rerank_topk: 10
+table_retriever: &table_retriever
+  type: table_retriever
+  llm_client: *chat_llm
+  recall_num: 10
+  rerank_topk: 10
 
 kag_solver_pipeline:
   memory:
@@ -107,6 +115,19 @@ kag_solver_pipeline:
   reasoner:
     type: table_reasoner # kag.solver.implementation.default_reasoner.DefaultReasoner
     llm_client: *chat_llm
+    vectorize_model: *vectorize_model
+    logic_form_plan_prompt:
+      type: logic_form_plan_table
+    resp_with_dk_generator:
+      type: resp_with_dk_generator
+    llm_backup:
+      type: llm_backup
+    resp_think_generator:
+      type: resp_think_generator
+    default_resp_judge:
+      type: default_resp_judge
+    rewrite_sub_question:
+      type: rewrite_sub_question
     lf_planner:
       type: default_lf_planner # kag.solver.plan.default_lf_planner.DefaultLFPlanner
       llm_client: *chat_llm
@@ -118,6 +139,8 @@ kag_solver_pipeline:
       exact_kg_retriever: *exact_kg_retriever
       fuzzy_kg_retriever: *fuzzy_kg_retriever
       chunk_retriever: *chunk_retriever
+      table_retriever: *table_retriever
+      vectorize_model: *vectorize_model
       merger:
         type: default_lf_sub_query_res_merger # kag.solver.execute.default_sub_query_merger.DefaultLFSubQueryResMerger
         vectorize_model: *vectorize_model

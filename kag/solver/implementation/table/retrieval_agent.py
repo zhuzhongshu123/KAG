@@ -6,13 +6,14 @@ import json
 import os
 import copy
 
-from kag.solver.implementation.default_reasoner import convert_lf_res_to_report_format
+from kag.solver.logic.core_modules.common.schema_utils import SchemaUtils
 from kag.solver.logic.core_modules.common.utils import generate_random_string
+from kag.solver.logic.core_modules.config import LogicFormConfiguration
 from knext.project.client import ProjectClient
-from kag.interface.retriever.chunk_retriever_abc import ChunkRetrieverABC
+from kag.solver.retriever.chunk_retriever import ChunkRetriever
 from kag.solver.implementation.table.search_tree import SearchTree, SearchTreeNode
-from kag.common.retriever.kag_retriever import DefaultRetriever
-from kag.common.llm.client import LLMClient
+from kag.solver.retriever.impl.default_chunk_retrieval import KAGRetriever
+from kag.interface.common.llm_client import LLMClient
 from kag.solver.logic.core_modules.common.one_hop_graph import (
     EntityData,
     OneHopGraphData,
@@ -20,71 +21,64 @@ from kag.solver.logic.core_modules.common.one_hop_graph import (
     RelationData,
     copy_one_hop_graph_data,
 )
-from kag.solver.logic.core_modules.retriver.retrieval_spo import (
-    FuzzyMatchRetrievalSpo,
-    ExactMatchRetrievalSpo,
-)
-from kag.solver.logic.core_modules.common.base_model import (
+from kag.solver.retriever.impl.default_fuzzy_kg_retriever import FuzzyMatchRetrieval
+from kag.interface.solver.base_model import (
     SPOBase,
     SPOEntity,
     SPORelation,
-    Identifer,
-    TypeInfo,
 )
-from kag.common.base.prompt_op import PromptOp
+from kag.interface.common.prompt import PromptABC
 from knext.reasoner.client import ReasonerClient
 from kag.solver.logic.core_modules.common.one_hop_graph import KgGraph
 from knext.reasoner.rest.models.reason_task_response import ReasonTaskResponse
 from kag.solver.logic.core_modules.parser.logic_node_parser import GetSPONode
 from knext.reasoner import ReasonTask
 from kag.solver.tools.graph_api.model.table_model import TableData
-from kag.solver.tools.graph_api.openspg_graph_api import (
-    OpenSPGGraphApi,
-    OneHopGraphData,
-)
-from kag.common.vectorizer import Vectorizer
-from kag.solver.logic.core_modules.common.text_sim_by_vector import TextSimilarity
+from kag.solver.logic.core_modules.common.one_hop_graph import OneHopGraphData
+from kag.solver.tools.graph_api.impl.openspg_graph_api import OpenSPGGraphApi
+from kag.solver.prompt.table.sub_question_answer import RespGenerator
+from kag.solver.prompt.table.select_docs import SelectDocsPrompt
+from kag.solver.prompt.table.select_graph import SelectGraphPrompt
+from kag.solver.prompt.table.retravel_gen_symbol import RetrivalGenerateSymbolPrompt
+llm_config = {
+            "type": "ant_deepseek",
+            "model": "deepseek-chat",
+            "key": "gs540iivzezmidi3",
+            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
+            "visitDomain": "BU_altas",
+            "visitBiz": "BU_altas_tianchang",
+            "visitBizLine": "BU_altas_tianchang_line",
+        }
 
 
-class TableRetrievalAgent(ChunkRetrieverABC):
+@ChunkRetriever.register("table_retriever")
+class TableRetrievalAgent(ChunkRetriever):
     def __init__(self, init_question, question, dk, **kwargs):
         super().__init__(**kwargs)
         self.init_question = init_question
         self.question = question
         self.dk = dk
-        self.chunk_retriever = DefaultRetriever(**kwargs)
+        self.schema_util = SchemaUtils(LogicFormConfiguration(kwargs))
+        self.chunk_retriever = KAGRetriever(**kwargs)
         self.reason: ReasonerClient = ReasonerClient(self.host_addr, self.project_id)
 
-        vectorizer_config = eval(os.getenv("KAG_VECTORIZER", "{}"))
         if self.host_addr and self.project_id:
             config = ProjectClient(
                 host_addr=self.host_addr, project_id=self.project_id
             ).get_config(self.project_id)
-            vectorizer_config.update(config.get("vectorizer", {}))
-        self.vectorizer: Vectorizer = Vectorizer.from_config(vectorizer_config)
-        self.text_similarity = TextSimilarity(vec_config=vectorizer_config)
-        self.fuzzy_match = FuzzyMatchRetrievalSpo(
-            text_similarity=self.text_similarity, llm=self.llm_module, KAG_PROMPT_BIZ_SCENE='FinState'
-        )
+
 
         self.graph_api: OpenSPGGraphApi = OpenSPGGraphApi(
             project_id=self.project_id, host_addr=self.host_addr
         )
-
-        self.sub_question_answer = PromptOp.load(self.biz_scene, "sub_question_answer")(
-            language=self.language
-        )
-
-        self.select_docs = PromptOp.load(self.biz_scene, "select_docs")(
-            language=self.language
-        )
-        self.select_graph = PromptOp.load(self.biz_scene, "select_graph")(
-            language=self.language
-        )
-        self.gen_symbol = PromptOp.load(self.biz_scene, "retravel_gen_symbol")(
-            language=self.language
-        )
-
+        # self.sub_question_answer = PromptABC.from_config({"type": "sub_question_answer"})
+        self.sub_question_answer = RespGenerator(language=self.language)
+        # self.select_docs = PromptABC.from_config({"type": "select_docs"})
+        self.select_docs = SelectDocsPrompt(language=self.language)
+        # self.select_graph = PromptABC.from_config({"type": "select_graph"})
+        self.select_graph = SelectGraphPrompt(language=self.language)
+        # self.retravel_gen_symbol = PromptABC.from_config({"type": "retravel_gen_symbol"})
+        self.retravel_gen_symbol = RetrivalGenerateSymbolPrompt(language=self.language)
     def recall_docs(self, query: str, top_k: int = 5, **kwargs) -> List[str]:
         # ner_query = f"{self.init_question}；子问题：{query}"
         ner_query = query
@@ -133,7 +127,7 @@ class TableRetrievalAgent(ChunkRetrieverABC):
         if len(passages) == 0:
             return []
         docs = "\n\n".join(passages)
-        llm: LLMClient = self.llm_module
+        llm: LLMClient = LLMClient.from_config(llm_config)
         return llm.invoke(
             {"docs": docs, "question": self.question, "dk": self.dk},
             self.select_docs,
@@ -176,10 +170,10 @@ class TableRetrievalAgent(ChunkRetrieverABC):
         # ]
 
         # 生成get_spo符号
-        llm: LLMClient = self.llm_module
+        llm: LLMClient = LLMClient.from_config(llm_config)
         get_spo_list = llm.invoke(
             {"input": self.question, "table_names": "\n".join([str(d) for d in table_name_list]), "dk": self.dk},
-            self.gen_symbol,
+            self.retravel_gen_symbol,
             with_json_parse=False,
             with_except=True,
         )
@@ -233,33 +227,34 @@ class TableRetrievalAgent(ChunkRetrieverABC):
             with_except=True,
         )
 
-        # 转换graph为可以页面可展示的格式
-        sub_logic_nodes_str = self._get_spo_list_to_str(get_spo_list)
-        context = [
-            "## SPO Retriever",
-            "#### logic_form expression: ",
-            f"```java\n{sub_logic_nodes_str}\n```",
-        ]
-        cur_content, sub_graph = convert_lf_res_to_report_format(
-            None, f"graph_{generate_random_string(3)}", 0, [], kg_graph_deep_copy
-        )
-        if cur_content:
-            context += cur_content
-        else:
-            context += [graph_docs]
-        history_log = {"report_info": {"context": context, "sub_graph": [sub_graph] if sub_graph else None}}
+        # # 转换graph为可以页面可展示的格式
+        # sub_logic_nodes_str = self._get_spo_list_to_str(get_spo_list)
+        # context = [
+        #     "## SPO Retriever",
+        #     "#### logic_form expression: ",
+        #     f"```java\n{sub_logic_nodes_str}\n```",
+        # ]
+        # cur_content, sub_graph = convert_lf_res_to_report_format(
+        #     None, f"graph_{generate_random_string(3)}", 0, [], kg_graph_deep_copy
+        # )
+        # if cur_content:
+        #     context += cur_content
+        # else:
+        #     context += [graph_docs]
+        # history_log = {"report_info": {"context": context, "sub_graph": [sub_graph] if sub_graph else None}}
 
-        return self.can_answer(answer), answer, [history_log]
+        # return self.can_answer(answer), answer, [history_log]
+        return self.can_answer(answer), answer, ""
 
     def can_answer(self, answer):
         if not answer:
             return False
         return "i don't know" not in answer.lower()
     def _table_kg_graph_with_desc(self, kg_graph: KgGraph):
-        table_cell_type = self.chunk_retriever.schema_util.get_label_within_prefix(
+        table_cell_type = self.schema_util.get_label_within_prefix(
             "TableCell"
         )
-        table_row_type = self.chunk_retriever.schema_util.get_label_within_prefix(
+        table_row_type = self.schema_util.get_label_within_prefix(
             "TableRow"
         )
         for _, edge_list in kg_graph.edge_map.items():
@@ -431,27 +426,6 @@ class TableRetrievalAgent(ChunkRetrieverABC):
                 onehop_graph_list.append(onehop_graph)
         return onehop_graph_list
 
-    def _get_o_score(self, o, o_entity: EntityData):
-        if "link" not in o:
-            # 不需要约束，全部返回
-            return 1
-        link_list = o["link"]
-        if isinstance(link_list, str):
-            link_list = [link_list]
-        entity_str_list = [
-            o_entity.prop.get_prop_value("row_name"),
-            o_entity.prop.get_prop_value("col_name"),
-        ]
-        entity_str_list = [s for s in entity_str_list if s is not None]
-        max_cosine_similarity = 0
-        for link_str in link_list:
-            for entity_str in entity_str_list:
-                link_vector = self.chunk_retriever.vectorizer.vectorize(link_str)
-                entity_vector = self.chunk_retriever.vectorizer.vectorize(entity_str)
-                cosine_similarity = self.cosine_similarity(link_vector, entity_vector)
-                if cosine_similarity > max_cosine_similarity:
-                    max_cosine_similarity = cosine_similarity
-        return max_cosine_similarity
 
     def cosine_similarity(self, vec1, vec2):
         import numpy as np
@@ -476,7 +450,7 @@ class TableRetrievalAgent(ChunkRetrieverABC):
                 type_str = tmp_type_str
         if type_str is None or len(type_str) <= 0:
             return ""
-        type_str = self.chunk_retriever.schema_util.get_label_within_prefix(type_str)
+        type_str = self.schema_util.get_label_within_prefix(type_str)
         type_str = ":`" + type_str + "`"
         return type_str
 
@@ -490,7 +464,7 @@ class TableRetrievalAgent(ChunkRetrieverABC):
         if isinstance(rerank_docs, str) and "i don't know" in rerank_docs.lower():
             return False, rerank_docs, None
         docs = "\n\n".join(rerank_docs)
-        llm: LLMClient = self.llm_module
+        llm: LLMClient = LLMClient.from_config(llm_config)
         answer = llm.invoke(
             {"docs": docs, "question": self.question, "dk": self.dk, "history": str(history)},
             self.sub_question_answer,
@@ -501,7 +475,7 @@ class TableRetrievalAgent(ChunkRetrieverABC):
         if "no" in can_answer.lower():
             # 尝试使用原始召回数据再回答一次
             docs = "\n\n".join(row_docs)
-            llm: LLMClient = self.llm_module
+            llm: LLMClient = LLMClient.from_config(llm_config)
             answer = llm.invoke(
                 {"docs": docs, "question": self.question, "dk": self.dk, "history": str(history)},
                 self.sub_question_answer,

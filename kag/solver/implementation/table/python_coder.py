@@ -6,13 +6,20 @@ import traceback
 import tempfile
 import subprocess
 
-from kag.solver.common.base import KagBaseModule
-
+from kag.interface.solver.base import KagBaseModule
 from kag.solver.implementation.table.search_tree import SearchTree, SearchTreeNode
-from kag.common.base.prompt_op import PromptOp
-from kag.common.llm.client import LLMClient
+from kag.interface.common.llm_client import LLMClient
+from kag.solver.prompt.table.python_coder_prompt import PythonCoderPrompt
 
-
+llm_config = {
+            "type": "ant_deepseek",
+            "model": "deepseek-chat",
+            "key": "gs540iivzezmidi3",
+            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
+            "visitDomain": "BU_altas",
+            "visitBiz": "BU_altas_tianchang",
+            "visitBizLine": "BU_altas_tianchang_line",
+        }
 class PythonCoderAgent(KagBaseModule):
     def __init__(
         self, init_question: str, question: str, history: SearchTree, **kwargs
@@ -22,10 +29,7 @@ class PythonCoderAgent(KagBaseModule):
         self.init_question = init_question
         self.question = question
         self.history = history
-        self.code_prompt = PromptOp.load(self.biz_scene, "python_coder_prompt")(
-            language=self.language
-        )
-
+        self.python_coder_prompt = PythonCoderPrompt(language=self.language)
     def answer(self):
         try_times = 3
         error = None
@@ -39,7 +43,7 @@ class PythonCoderAgent(KagBaseModule):
         return "I don't know", code
 
     def _run_onetime(self, error: str):
-        llm: LLMClient = self.llm_module
+        llm: LLMClient = LLMClient.from_config(llm_config)
         python_code = llm.invoke(
             {
                 "question": self.question,
@@ -47,7 +51,7 @@ class PythonCoderAgent(KagBaseModule):
                 "error": error,
                 "dk": self.history.dk,
             },
-            self.code_prompt,
+            self.python_coder_prompt,
             with_except=True,
         )
 

@@ -103,6 +103,7 @@ class LLMClient(Registrable):
                 if with_json_parse
                 else self(prompt)
             )
+            # import pdb;pdb.set_trace()
             logger.debug(f"Response: {response}")
             result = prompt_op.parse_response(response, model=self.model, **variables)
             logger.debug(f"Result: {result}")
