@@ -16,6 +16,8 @@ from kag.common.registry import import_modules_from_path
 
 from kag.builder.runner import BuilderChainRunner
 
+from kag.examples.FinState.builder.graph_db_tools import clear_neo4j_data
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,8 +33,9 @@ def buildKB(file_path):
 
 
 if __name__ == "__main__":
-    import_modules_from_path("/Users/zhangxinhong.zxh/workspace/KAG/dep/KAG/kag/examples/FinState/component")
+    clear_neo4j_data("finstate")
+    import_modules_from_path("/Users/zhangxinhong.zxh/workspace/KAG/dep/KAG/kag/examples/FinState/builder_component")
     dir_path = os.path.dirname(__file__)
-    file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告.md")
+    file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告-1.md")
 
     buildKB(file_path)

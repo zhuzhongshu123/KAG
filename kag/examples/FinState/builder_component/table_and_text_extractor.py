@@ -110,12 +110,16 @@ class TableAndTextExtractor(ExtractorABC):
         table_chunk: Chunk = input
         if table_chunk.type == ChunkTypeEnum.Table:
             return self._invoke_table(input, **kwargs)
-        # return self.schema_free_extractor._invoke(input, **kwargs)
         return []
+        return self.schema_free_extractor._invoke(input, **kwargs)
 
     def _invoke_table(self, input: Chunk, **kwargs) -> List[Output]:
-        self._table_classify(input)
-        return self._table_extractor(input)
+        try:
+            self._table_classify(input)
+            return self._table_extractor(input)
+        except:
+            logger.exception("extractor table error")
+        return []
 
     def _table_extractor(self, input: Chunk):
         table_type = input.kwargs["table_type"]
@@ -175,9 +179,11 @@ class TableAndTextExtractor(ExtractorABC):
         if hasattr(table_chunk, "parent_id"):
             parent_id = os.path.basename(table_chunk.parent_id)
             table_context_str = parent_id + "\n" + table_context_str
+        before_text = table_chunk.kwargs["metadata"].get("before_text", "")
+        after_text = table_chunk.kwargs["metadata"].get("after_text", "")
         if len(table_context_str) <= 0:
             return None
-        return table_context_str
+        return before_text + "\n" + table_context_str + "\n" + after_text
 
     def _extract_metric_table(self, input_table: Chunk):
         table_info = input_table.kwargs["table_info"]
@@ -409,7 +415,6 @@ class TableAndTextExtractor(ExtractorABC):
                 properties={
                     "raw_name": row_name.lstrip("-").strip(),
                     "content": row_value.to_csv(),
-                    "desc": table_desc,
                 },
             )
             rows[idx] = (row_name.lstrip("-").strip(), node.id)

@@ -102,4 +102,5 @@ $input
 
     def parse_response(self, response: str, **kwargs):
         rsp = response
+        rsp = rsp.strip("```markdown").strip("```")
         return rsp
