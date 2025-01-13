@@ -6,13 +6,10 @@ openie_llm: &openie_llm
   type: maas
 
 chat_llm: &chat_llm
-            type: ant_deepseek
-            model: deepseek-chat
-            key: gs540iivzezmidi3
-            url: https://zdfmng.alipay.com/commonQuery/queryData
-            visitDomain: BU_altas
-            visitBiz: BU_altas_tianchang
-            visitBizLine: BU_altas_tianchang_line
+  api_key: sk-4323e7aaab36449fab52b0ed86e29696
+  base_url: https://api.deepseek.com
+  model: deepseek-chat
+  type: maas
 
 vectorize_model: &vectorize_model
   api_key: sk-yndixxjfxvnsqfkvfuyubkxidhtwicjcflprvqguffrmxbrv

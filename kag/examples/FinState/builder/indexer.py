@@ -34,7 +34,9 @@ def buildKB(file_path):
 
 if __name__ == "__main__":
     clear_neo4j_data("finstate")
-    import_modules_from_path("/Users/zhangxinhong.zxh/workspace/KAG/dep/KAG/kag/examples/FinState/builder_component")
+    import_modules_from_path(
+        "/Users/zhangxinhong.zxh/workspace/KAG/dep/KAG/kag/examples/FinState/builder_component"
+    )
     dir_path = os.path.dirname(__file__)
     file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告-1.md")
 

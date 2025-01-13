@@ -13,20 +13,22 @@ from kag.solver.tools.info_processor import ReporterIntermediateProcessTool
 from kag.solver.implementation.table.python_coder import PythonCoderAgent
 from kag.solver.prompt.table.logic_form_plan_table import LogicFormPlanPrompt
 from kag.solver.prompt.table.resp_with_dk_generator import RespGenerator
-from kag.solver.prompt.table.llm_backup import RespGenerator
 from kag.solver.prompt.table.resp_think_generator import RethinkRespGenerator
 from kag.solver.prompt.default.resp_judge import RespJudge
 from kag.solver.prompt.table.rewrite_sub_question import RewriteSubQuestionPrompt
+
 logger = logging.getLogger()
 llm_config = {
-            "type": "ant_deepseek",
-            "model": "deepseek-chat",
-            "key": "gs540iivzezmidi3",
-            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
-            "visitDomain": "BU_altas",
-            "visitBiz": "BU_altas_tianchang",
-            "visitBizLine": "BU_altas_tianchang_line",
-        }
+    "type": "ant_deepseek",
+    "model": "deepseek-chat",
+    "key": "gs540iivzezmidi3",
+    "url": "https://zdfmng.alipay.com/commonQuery/queryData",
+    "visitDomain": "BU_altas",
+    "visitBiz": "BU_altas_tianchang",
+    "visitBizLine": "BU_altas_tianchang_line",
+}
+
+
 @KagReasonerABC.register("table_reasoner")
 class TableReasoner(KagReasonerABC):
     """
@@ -36,9 +38,7 @@ class TableReasoner(KagReasonerABC):
     DOMAIN_KNOWLEDGE_INJECTION = "在当前会话注入领域知识"
     DOMAIN_KNOWLEDGE_QUERY = "返回当前会话的领域知识"
 
-    def __init__(
-        self, lf_planner: LFPlannerABC = None, **kwargs
-    ):
+    def __init__(self, lf_planner: LFPlannerABC = None, **kwargs):
         super().__init__(lf_planner=lf_planner, **kwargs)
         self.kwargs = kwargs
         self.session_id = kwargs.get("session_id", 0)
@@ -47,8 +47,6 @@ class TableReasoner(KagReasonerABC):
         self.logic_form_plan_prompt = LogicFormPlanPrompt(language=self.language)
         # self.resp_generator = PromptABC.from_config({"type": "resp_with_dk_generator"})
         self.resp_generator = RespGenerator(language=self.language)
-        # self.llm_backup = PromptABC.from_config({"type": "llm_backup"})
-        self.llm_backup = RespGenerator(language=self.language)
         # self.resp_think_generator = PromptABC.from_config({"type": "resp_think_generator"})
         self.resp_think_generator = RethinkRespGenerator(language=self.language)
         # self.judge_prompt = PromptABC.from_config({"type": "default_resp_judge"})
@@ -307,8 +305,8 @@ class TableReasoner(KagReasonerABC):
         self.update_node(node, answer, trace_log)
         node.answer = answer
         return False, node.answer
-    
-    def _get_subquestion_pre(self, history:SearchTree):
+
+    def _get_subquestion_pre(self, history: SearchTree):
         rst = history._get_all_qa_str()
         return rst
 

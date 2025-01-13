@@ -24,6 +24,7 @@ from tenacity import stop_after_attempt, retry
 
 from kag.interface import ExtractorABC, PromptABC, ExternalGraphLoaderABC
 from kag.builder.model.chunk import Chunk, ChunkTypeEnum
+from kag.common.utils import generate_hash_id
 
 from kag.common.conf import KAG_PROJECT_CONF
 from kag.common.utils import processing_phrases, to_camel_case
@@ -115,6 +116,7 @@ class TableAndTextExtractor(ExtractorABC):
 
     def _invoke_table(self, input: Chunk, **kwargs) -> List[Output]:
         try:
+            input.id = generate_hash_id(input.content)
             self._table_classify(input)
             return self._table_extractor(input)
         except:
@@ -363,12 +365,10 @@ class TableAndTextExtractor(ExtractorABC):
     ):
         nodes = []
         edges = []
-        import pickle
 
         # with open("table_data.pkl", "wb") as f:
         #     pickle.dump((input_table, table_df, table_cell_info), f)
         # print("write to table_data.pkl")
-
         table_id = input_table.id
 
         # keywords node

@@ -40,15 +40,8 @@ from kag.solver.prompt.table.sub_question_answer import RespGenerator
 from kag.solver.prompt.table.select_docs import SelectDocsPrompt
 from kag.solver.prompt.table.select_graph import SelectGraphPrompt
 from kag.solver.prompt.table.retravel_gen_symbol import RetrivalGenerateSymbolPrompt
-llm_config = {
-            "type": "ant_deepseek",
-            "model": "deepseek-chat",
-            "key": "gs540iivzezmidi3",
-            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
-            "visitDomain": "BU_altas",
-            "visitBiz": "BU_altas_tianchang",
-            "visitBizLine": "BU_altas_tianchang_line",
-        }
+from kag.solver.logic.core_modules.common.text_sim_by_vector import TextSimilarity
+from kag.common.conf import KAG_CONFIG
 
 
 @ChunkRetriever.register("table_retriever")
@@ -67,7 +60,6 @@ class TableRetrievalAgent(ChunkRetriever):
                 host_addr=self.host_addr, project_id=self.project_id
             ).get_config(self.project_id)
 
-
         self.graph_api: OpenSPGGraphApi = OpenSPGGraphApi(
             project_id=self.project_id, host_addr=self.host_addr
         )
@@ -79,6 +71,14 @@ class TableRetrievalAgent(ChunkRetriever):
         self.select_graph = SelectGraphPrompt(language=self.language)
         # self.retravel_gen_symbol = PromptABC.from_config({"type": "retravel_gen_symbol"})
         self.retravel_gen_symbol = RetrivalGenerateSymbolPrompt(language=self.language)
+
+        self.llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
+
+        self.text_similarity = TextSimilarity()
+        self.fuzzy_match = FuzzyMatchRetrieval(
+            llm=self.llm, text_similarity=self.text_similarity
+        )
+
     def recall_docs(self, query: str, top_k: int = 5, **kwargs) -> List[str]:
         # ner_query = f"{self.init_question}；子问题：{query}"
         ner_query = query
@@ -127,14 +127,13 @@ class TableRetrievalAgent(ChunkRetriever):
         if len(passages) == 0:
             return []
         docs = "\n\n".join(passages)
-        llm: LLMClient = LLMClient.from_config(llm_config)
-        return llm.invoke(
+        return self.llm.invoke(
             {"docs": docs, "question": self.question, "dk": self.dk},
             self.select_docs,
             with_except=True,
         )
 
-    def symbol_solver(self, history:SearchTree):
+    def symbol_solver(self, history: SearchTree):
         """
         符号求解
         """
@@ -153,15 +152,18 @@ class TableRetrievalAgent(ChunkRetriever):
                     "name": node["node"]["name"],
                     "desc": node["node"].get("desc", ""),
                     "content": node["node"].get("content", ""),
-                    "score": node["score"]
+                    "score": node["score"],
                 }
         for node in s_nodes_with_desc:
-            if node["node"]["name"] not in s_table_info or node["score"] > s_table_info[node["node"]["name"]]["score"]:
+            if (
+                node["node"]["name"] not in s_table_info
+                or node["score"] > s_table_info[node["node"]["name"]]["score"]
+            ):
                 s_table_info[node["node"]["name"]] = {
                     "name": node["node"]["name"],
                     "desc": node["node"].get("desc", ""),
                     "content": node["node"].get("content", ""),
-                    "score": node["score"]
+                    "score": node["score"],
                 }
 
         table_name_list = list(s_table_info.keys())
@@ -170,15 +172,21 @@ class TableRetrievalAgent(ChunkRetriever):
         # ]
 
         # 生成get_spo符号
-        llm: LLMClient = LLMClient.from_config(llm_config)
-        get_spo_list = llm.invoke(
-            {"input": self.question, "table_names": "\n".join([str(d) for d in table_name_list]), "dk": self.dk},
+        get_spo_list = self.llm.invoke(
+            {
+                "input": self.question,
+                "table_names": "\n".join([str(d) for d in table_name_list]),
+                "dk": self.dk,
+            },
             self.retravel_gen_symbol,
             with_json_parse=False,
             with_except=True,
         )
 
-        print("table_symbol_retrival,get_spo_list=" + json.dumps(get_spo_list, ensure_ascii=False))
+        print(
+            "table_symbol_retrival,get_spo_list="
+            + json.dumps(get_spo_list, ensure_ascii=False)
+        )
 
         # 在图上查询
         last_var = None
@@ -187,7 +195,7 @@ class TableRetrievalAgent(ChunkRetriever):
             s = get_spo["s"]
             p = get_spo["p"]
             o = get_spo["o"]
-            last_var = o.get('var', None)
+            last_var = o.get("var", None)
             desc = get_spo["desc"]
 
             onehop_graph_list = self._query_spo(s, p, o, kg_graph)
@@ -196,13 +204,11 @@ class TableRetrievalAgent(ChunkRetriever):
                 break
             query = f"overall_goal: {self.init_question}, current_subquestion: {self.question}, current_step: {desc}"
             n: GetSPONode = self._gen_get_spo_node(get_spo, query, kg_graph)
-            total_one_kg_graph, matched_flag = self.fuzzy_match.match_spo(
+            total_one_kg_graph = self.fuzzy_match.match_spo(
                 n=n,
                 one_hop_graph_list=onehop_graph_list,
-                sim_topk=20,
-                disable_attr=True,
             )
-            if not matched_flag:
+            if not total_one_kg_graph or len(total_one_kg_graph.edge_map) <= 0:
                 # 没有合理的数据
                 break
             kg_graph.merge_kg_graph(total_one_kg_graph)
@@ -221,8 +227,13 @@ class TableRetrievalAgent(ChunkRetriever):
             graph_docs = [str(d) for d in last_data]
 
         # 回答子问题
-        answer = llm.invoke(
-            {"docs": graph_docs, "question": self.question, "dk": self.dk, "history": str(history)},
+        answer = self.llm.invoke(
+            {
+                "docs": graph_docs,
+                "question": self.question,
+                "dk": self.dk,
+                "history": str(history),
+            },
             self.sub_question_answer,
             with_except=True,
         )
@@ -250,13 +261,10 @@ class TableRetrievalAgent(ChunkRetriever):
         if not answer:
             return False
         return "i don't know" not in answer.lower()
+
     def _table_kg_graph_with_desc(self, kg_graph: KgGraph):
-        table_cell_type = self.schema_util.get_label_within_prefix(
-            "TableCell"
-        )
-        table_row_type = self.schema_util.get_label_within_prefix(
-            "TableRow"
-        )
+        table_cell_type = self.schema_util.get_label_within_prefix("TableCell")
+        table_row_type = self.schema_util.get_label_within_prefix("TableRow")
         for _, edge_list in kg_graph.edge_map.items():
             for edge in edge_list:
                 edge: RelationData = edge
@@ -306,8 +314,8 @@ class TableRetrievalAgent(ChunkRetriever):
             _type = s_obj["type"]
         s: SPOBase = SPOEntity(
             entity_id=None,
-            entity_type=_type,
-            entity_type_zh=_type,
+            std_entity_type=_type,
+            un_std_entity_type=_type,
             entity_name=str(_name) if _name else None,
             alias_name=alias_name,
         )
@@ -426,7 +434,6 @@ class TableRetrievalAgent(ChunkRetriever):
                 onehop_graph_list.append(onehop_graph)
         return onehop_graph_list
 
-
     def cosine_similarity(self, vec1, vec2):
         import numpy as np
 
@@ -464,26 +471,38 @@ class TableRetrievalAgent(ChunkRetriever):
         if isinstance(rerank_docs, str) and "i don't know" in rerank_docs.lower():
             return False, rerank_docs, None
         docs = "\n\n".join(rerank_docs)
-        llm: LLMClient = LLMClient.from_config(llm_config)
-        answer = llm.invoke(
-            {"docs": docs, "question": self.question, "dk": self.dk, "history": str(history)},
+        answer = self.llm.invoke(
+            {
+                "docs": docs,
+                "question": self.question,
+                "dk": self.dk,
+                "history": str(history),
+            },
             self.sub_question_answer,
             with_except=True,
         )
         can_answer = self.can_answer(answer)
         answer_res = answer
-        if "no" in can_answer.lower():
+        if not can_answer:
             # 尝试使用原始召回数据再回答一次
             docs = "\n\n".join(row_docs)
-            llm: LLMClient = LLMClient.from_config(llm_config)
-            answer = llm.invoke(
-                {"docs": docs, "question": self.question, "dk": self.dk, "history": str(history)},
+            answer = self.llm.invoke(
+                {
+                    "docs": docs,
+                    "question": self.question,
+                    "dk": self.dk,
+                    "history": str(history),
+                },
                 self.sub_question_answer,
                 with_except=True,
             )
             can_answer = self.can_answer(answer)
             answer_res = answer
-        return can_answer, answer_res, [{"report_info": {"context": docs, "sub_graph": None}}]
+        return (
+            can_answer,
+            answer_res,
+            [{"report_info": {"context": docs, "sub_graph": None}}],
+        )
 
     def get_sub_item_reall(self, entities):
         index = self.question.find("的所有子项")

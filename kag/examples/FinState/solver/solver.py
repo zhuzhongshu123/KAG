@@ -2,15 +2,6 @@ from kag.interface import LLMClient
 from kag.solver.logic.solver_pipeline import SolverPipeline
 from kag.solver.implementation.table.table_reasoner import TableReasoner
 
-llm_config = {
-            "type": "ant_deepseek",
-            "model": "deepseek-chat",
-            "key": "gs540iivzezmidi3",
-            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
-            "visitDomain": "BU_altas",
-            "visitBiz": "BU_altas_tianchang",
-            "visitBizLine": "BU_altas_tianchang_line",
-        }
 class FinStateSolver(SolverPipeline):
     """
     solver
@@ -20,7 +11,10 @@ class FinStateSolver(SolverPipeline):
         self, max_run=3, reflector=None, reasoner=None, generator=None, **kwargs
     ):
         super().__init__(max_run, reflector, reasoner, generator, **kwargs)
-        llm: LLMClient = LLMClient.from_config(llm_config)
+
+        from kag.common.conf import KAG_CONFIG
+        KAG_CONFIG.all_config["chat_llm"]
+        llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
         self.table_reasoner = TableReasoner(llm_module = llm)
 
     def run(self, question, **kwargs):

@@ -10,16 +10,8 @@ from kag.interface.solver.base import KagBaseModule
 from kag.solver.implementation.table.search_tree import SearchTree, SearchTreeNode
 from kag.interface.common.llm_client import LLMClient
 from kag.solver.prompt.table.python_coder_prompt import PythonCoderPrompt
+from kag.common.conf import KAG_CONFIG
 
-llm_config = {
-            "type": "ant_deepseek",
-            "model": "deepseek-chat",
-            "key": "gs540iivzezmidi3",
-            "url": "https://zdfmng.alipay.com/commonQuery/queryData",
-            "visitDomain": "BU_altas",
-            "visitBiz": "BU_altas_tianchang",
-            "visitBizLine": "BU_altas_tianchang_line",
-        }
 class PythonCoderAgent(KagBaseModule):
     def __init__(
         self, init_question: str, question: str, history: SearchTree, **kwargs
@@ -30,6 +22,8 @@ class PythonCoderAgent(KagBaseModule):
         self.question = question
         self.history = history
         self.python_coder_prompt = PythonCoderPrompt(language=self.language)
+        self.llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
+
     def answer(self):
         try_times = 3
         error = None
@@ -43,8 +37,7 @@ class PythonCoderAgent(KagBaseModule):
         return "I don't know", code
 
     def _run_onetime(self, error: str):
-        llm: LLMClient = LLMClient.from_config(llm_config)
-        python_code = llm.invoke(
+        python_code = self.llm.invoke(
             {
                 "question": self.question,
                 "context": str(self.history.as_subquestion_context_json()),
