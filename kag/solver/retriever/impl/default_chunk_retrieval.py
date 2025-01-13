@@ -8,7 +8,10 @@
 # Unless required by applicable law or agreed to in writing, software distributed under the License
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied.
+
+import sys
 import knext.common.cache
+from kag.builder.component import BatchVectorizer
 from kag.interface import PromptABC, VectorizeModelABC
 from tenacity import retry, stop_after_attempt
 
@@ -18,7 +21,10 @@ from typing import List, Dict, Optional
 
 import numpy as np
 import logging
-
+from knext.graph.client import GraphClient
+from kag.solver.logic.core_modules.common.schema_utils import SchemaUtils
+from kag.solver.logic.core_modules.config import LogicFormConfiguration
+from kag.interface.common.vectorize_model import VectorizeModelABC
 from kag.solver.tools.graph_api.graph_api_abc import GraphApiABC
 from kag.solver.tools.search_api.search_api_abc import SearchApiABC
 from knext.schema.client import CHUNK_TYPE, OTHER_TYPE
@@ -31,12 +37,21 @@ from kag.solver.logic.core_modules.common.text_sim_by_vector import (
     cosine_similarity,
 )
 from kag.solver.utils import init_prompt_with_fallback
-
+from knext.search.client import SearchClient
+from kag.solver.prompt.table.question_ner import QuestionNER
+from knext.reasoner.client import ReasonerClient
 logger = logging.getLogger(__name__)
 
 ner_cache = knext.common.cache.LinkCache(maxsize=100, ttl=300)
 query_sim_doc_cache = knext.common.cache.LinkCache(maxsize=100, ttl=300)
 
+conf = {
+        "api_key": "sk - yndixxjfxvnsqfkvfuyubkxidhtwicjcflprvqguffrmxbrv",
+        "base_url": "https://api.siliconflow.cn/v1/",
+        "model": "BAAI / bge - m3",
+        "type": "openai",
+        "vector_dimensions": "1024",
+    }
 
 @ChunkRetriever.register("kag")
 class KAGRetriever(ChunkRetriever):
@@ -65,17 +80,23 @@ class KAGRetriever(ChunkRetriever):
         search_api: SearchApiABC = None,
         llm_client: LLMClient = None,
         **kwargs,
+
     ):
         super().__init__(
             recall_num, rerank_topk, graph_api, search_api, llm_client, **kwargs
         )
+        self.graph_algo = GraphClient(self.host_addr, self.project_id)
+        self.schema_util = SchemaUtils(LogicFormConfiguration(kwargs))
+        self.sc: SearchClient = SearchClient(self.host_addr, self.project_id)
+        self.reason: ReasonerClient = ReasonerClient(self.host_addr, self.project_id)
+        self.vectorizer = VectorizeModelABC.from_config({'api_key': 'sk-yndixxjfxvnsqfkvfuyubkxidhtwicjcflprvqguffrmxbrv', 'base_url': 'https://api.siliconflow.cn/v1/', 'model': 'BAAI/bge-m3', 'type': 'openai', 'vector_dimensions': 1024})
         if vectorize_model is None:
             vectorize_model = Vectorizer.from_config(
                 KAG_CONFIG.all_config["vectorize_model"]
             )
         self.vectorize_model = vectorize_model
         if ner_prompt is None:
-            ner_prompt = init_prompt_with_fallback("question_ner", self.biz_scene)
+            ner_prompt = QuestionNER(language=self.language)
 
         self.ner_prompt = ner_prompt
         if std_prompt is None:
@@ -549,8 +570,138 @@ class KAGRetriever(ChunkRetriever):
         if self.reranker is None:
             return passages
         return self.reranker.rerank(queries, passages)
+    def retrieval_table_metric_by_vector(
+        self, query, query_type: str, top_k: int = 3, threashold=0.8
+    ) -> List[str]:
+        query_type = self.schema_util.get_label_within_prefix(query_type)
+
+        rst = []
+        try:
+            typed_nodes = self.sc.search_vector(
+                label=query_type,
+                property_key="name",
+                query_vector=self.vectorizer.vectorize(query),
+                topk=top_k,
+            )
+            for node in typed_nodes:
+                if node["score"] > threashold:
+                    rst.append(node)
+                    if len(rst) >= top_k:
+                        return rst
+        except Exception:
+            logger.exception("query_vertor_error,%s", query)
+        return rst
+    def retrieval_table_metric_by_page_rank(
+        self, entities: list, topk=10, target_type: str = "TableMetric"
+    ) -> List[str]:
+        rst = []
+        if len(entities) <= 0:
+            return rst
+        label = self.schema_util.get_label_within_prefix(target_type)
+        for entity in entities:
+            entity["name"] = entity["id"]
+        scores = self.graph_algo.calculate_pagerank_scores(
+            self.schema_util.get_label_within_prefix(target_type), entities
+        )
+        scores = {k: s for k, s in scores.items() if float(s) > sys.float_info.min}
+        if len(scores) > topk:
+            sorted_scores = sorted(
+                scores.items(), key=lambda item: item[1], reverse=True
+            )
+            scores = sorted_scores[:topk]
+        else:
+            scores = scores.items()
+        for entity_id, _ in scores:
+            node = self.reason.query_node(
+                label=label,
+                id_value=entity_id,
+            )
+            node_dict = dict(node.items())
+            node_dict["label"] = label
+            rst.append(node_dict)
+        return rst
+    def get_table_metrics_by_query(self, query: str, topk=10):
+        """
+        query table metrics from entities
+        """
+        entities = self.named_entity_recognition(query)
+        if len(entities) <= 0:
+            return {}
+        (entities, scores) = self.match_table_mertric_constraint(entities)
+        table_metrics_list = self.retrieval_table_metric_by_page_rank(
+            entities=entities, topk=topk
+        )
+        rst_list = [
+            {k: d[k] for k in {"id", "name"} if k in d} for d in table_metrics_list
+        ]
+        return rst_list
+
+    def get_table_metrics_by_entities(self, entities: List, topk: int = 10):
+        table_metrics_list = self.retrieval_table_metric_by_page_rank(
+            entities=entities, topk=topk
+        )
+        rst_list = [
+            {k: d[k] for k in {"id", "name"} if k in d} for d in table_metrics_list
+        ]
+        return rst_list
+    def query_table_subitem(self, entities: List, item_key: str):
+        """
+        query subitem
+        """
+        pass
+
+    def query_row_table(self, entities: List, num: int = 1):
+        """
+        query row table
+        """
+        table_list = self.retrieval_table_metric_by_page_rank(
+            entities=entities, topk=num, target_type="Table"
+        )
+        rst_list = [{k: d[k] for k in {"id", "content"} if k in d} for d in table_list]
+        return rst_list
+
+    def match_table_mertric_constraint(self, queries: List[str], top_k: int = 3):
+        matched_entities = []
+        matched_entities_scores = []
+        for entity in queries:
+            query = processing_phrases(entity)
+            query_type = "TableKeyWord"
+            query_type = self.schema_util.get_label_within_prefix(query_type)
+            try:
+                typed_nodes = self.sc.search_vector(
+                    label=query_type,
+                    property_key="name",
+                    query_vector=self.vectorizer.vectorize(query),
+                    topk=top_k,
+                )
+                for node in typed_nodes:
+                    if node["score"] > 0.9:
+                        matched_entities.append(
+                            {
+                                "name": node["node"]["name"],
+                                "type": query_type,
+                                "id": node["node"]["id"],
+                                "score": node["score"],
+                            }
+                        )
+                        matched_entities_scores.append(node["score"])
+            except Exception:
+                logger.exception("query_vertor_error,%s", query)
+                continue
+        return matched_entities, matched_entities_scores
 
 
+    def _search_nodes_by_vector(self, query, _type, threshold=0.9, topk=10, property_key="name"):
+        query_type = self.schema_util.get_label_within_prefix(_type)
+        query_vector = self.vectorizer.vectorize(query)
+        typed_nodes = self.sc.search_vector(
+            label=query_type,
+            property_key=property_key,
+            query_vector=query_vector,
+            topk=topk,
+        )
+        filtered_typed_nodes = [n for n in typed_nodes if n["score"] > threshold]
+        return filtered_typed_nodes
 @ChunkRetriever.register("default_chunk_retriever")
 class DefaultChunkRetriever(KAGRetriever):
     def __init__(

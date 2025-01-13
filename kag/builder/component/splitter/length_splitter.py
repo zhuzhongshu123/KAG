@@ -168,11 +168,13 @@ class LengthSplitter(BaseTableSplitter):
         """
         cutted = []
         if isinstance(input, list):
+            return input
             for item in input:
                 cutted.extend(
                     self.slide_window_chunk(item, self.split_length, self.window_length)
                 )
         else:
+            return [input]
             cutted.extend(
                 self.slide_window_chunk(input, self.split_length, self.window_length)
             )

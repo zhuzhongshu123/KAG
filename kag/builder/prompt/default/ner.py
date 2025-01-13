@@ -151,6 +151,11 @@ class OpenIENERPrompt(PromptABC):
         self.schema = SchemaClient(
             project_id=KAG_PROJECT_CONF.project_id
         ).extract_types()
+        filterd = []
+        for obj_type in self.schema:
+            if not obj_type.startswith("Table"):
+                filterd.append(obj_type)
+        self.schema = filterd
         self.template = Template(self.template).safe_substitute(
             schema=json.dumps(self.schema)
         )

@@ -11,6 +11,7 @@
 # or implied.
 import copy
 
+from kag.examples.FinState.solver.solver import FinStateSolver
 from kag.solver.logic.solver_pipeline import SolverPipeline
 from kag.solver.tools.info_processor import ReporterIntermediateProcessTool
 
@@ -24,6 +25,7 @@ class SolverMain:
         task_id: int,
         query: str,
         is_report=True,
+        session_id: int = 0,
         host_addr="http://127.0.0.1:8887",
     ):
         # resp
@@ -90,9 +92,10 @@ class SolverMain:
         conf = copy.deepcopy(
             KAG_CONFIG.all_config.get("lf_solver_pipeline", default_pipeline_config)
         )
-        resp = SolverPipeline.from_config(conf)
-        answer, trace_log = resp.run(query, report_tool=report_tool)
-        print(trace_log)
+        solver = FinStateSolver(
+            report_tool=report_tool, KAG_PROJECT_ID=project_id, session_id=session_id
+        )
+        answer = solver.run(query, report_tool=report_tool)
         report_tool.report_final_answer(
             query, answer, ReporterIntermediateProcessTool.STATE.FINISH
         )

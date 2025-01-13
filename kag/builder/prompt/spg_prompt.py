@@ -37,7 +37,7 @@ class SPGPrompt(PromptABC):
         ignored_relations (List[str]): List of relations to be ignored.
     """
 
-    ignored_types: List[str] = ["Chunk"]
+    ignored_types: List[str] = ["Chunk", "Table", "MetricConstraint", "TableMetric"]
     ignored_properties: List[str] = [
         "id",
         "stdId",
