@@ -85,7 +85,7 @@ class TableRetrievalAgent(ChunkRetriever):
         entities = self.chunk_retriever.named_entity_recognition(query=ner_query)
         all_entities = set()
         for entity in entities:
-            all_entities.add(entity["entity"])
+            all_entities.add(entity["name"])
             for i, alias in enumerate(entity["alias"]):
                 if i <= 1:
                     all_entities.add(alias)

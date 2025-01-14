@@ -30,14 +30,24 @@ def buildKB(file_path):
     runner.invoke(file_path)
 
     logger.info(f"\n\nbuildKB successfully for {file_path}\n\n")
+#
 
+def buildChunkKB(file_path):
+    from kag.common.conf import KAG_CONFIG
+
+    runner = BuilderChainRunner.from_config(
+        KAG_CONFIG.all_config["kag_chunk_builder_pipeline"]
+    )
+    runner.invoke(file_path)
+
+    logger.info(f"\n\nbuildChunkKB successfully for {file_path}\n\n")
 
 if __name__ == "__main__":
     clear_neo4j_data("finstate")
     import_modules_from_path(
-        "/Users/zhangxinhong.zxh/workspace/KAG/dep/KAG/kag/examples/FinState/builder_component"
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), "../builder_component")
     )
     dir_path = os.path.dirname(__file__)
     file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告-1.md")
 
-    buildKB(file_path)
+    buildChunkKB(file_path)

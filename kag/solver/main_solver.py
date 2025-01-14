@@ -93,9 +93,9 @@ class SolverMain:
             KAG_CONFIG.all_config.get("lf_solver_pipeline", default_pipeline_config)
         )
         solver = FinStateSolver(
-            report_tool=report_tool, KAG_PROJECT_ID=project_id, session_id=session_id
+            report_tool=report_tool, KAG_PROJECT_ID=project_id
         )
-        answer = solver.run(query, report_tool=report_tool)
+        answer = solver.run(query, report_tool=report_tool, session_id=session_id)
         report_tool.report_final_answer(
             query, answer, ReporterIntermediateProcessTool.STATE.FINISH
         )
