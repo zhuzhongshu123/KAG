@@ -14,7 +14,7 @@ import os
 
 from setuptools import setup, find_packages
 
-package_name = "openspg-kag"
+package_name = "openspg-kag-ant-zhenzhitu"
 
 # version
 cwd = os.path.abspath(os.path.dirname(__file__))

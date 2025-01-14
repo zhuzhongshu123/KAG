@@ -1,5 +1,4 @@
 recursive-include kag *
-recursive-exclude kag/examples *
 global-exclude *.pyc
 global-exclude *.pyo
 global-exclude *.pyd

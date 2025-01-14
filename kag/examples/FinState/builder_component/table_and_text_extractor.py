@@ -111,7 +111,6 @@ class TableAndTextExtractor(ExtractorABC):
         table_chunk: Chunk = input
         if table_chunk.type == ChunkTypeEnum.Table:
             return self._invoke_table(input, **kwargs)
-        return []
         return self.schema_free_extractor._invoke(input, **kwargs)
 
     def _invoke_table(self, input: Chunk, **kwargs) -> List[Output]:

@@ -22,10 +22,10 @@ class SolverMain:
     def invoke(
         self,
         project_id: int,
+        session_id: int,
         task_id: int,
         query: str,
         is_report=True,
-        session_id: int = 0,
         host_addr="http://127.0.0.1:8887",
     ):
         # resp
