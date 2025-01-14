@@ -9,13 +9,15 @@ class FinStateSolver(SolverPipeline):
     """
 
     def __init__(
-        self, max_run=3, reflector=None, reasoner=None, generator=None, **kwargs
+        self, max_run=3, reflector=None, reasoner=None, generator=None, llm_client = None, **kwargs
     ):
         super().__init__(max_run, reflector, reasoner, generator, **kwargs)
 
-        from kag.common.conf import KAG_CONFIG
-        KAG_CONFIG.all_config["chat_llm"]
-        llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
+        llm = llm_client
+        if not llm:
+            from kag.common.conf import KAG_CONFIG
+            llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
+
         self.table_reasoner = TableReasoner(llm_module = llm, **kwargs)
 
     def run(self, question, **kwargs):

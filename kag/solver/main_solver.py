@@ -12,7 +12,7 @@
 import copy
 
 from kag.examples.FinState.solver.solver import FinStateSolver
-from kag.solver.logic.solver_pipeline import SolverPipeline
+from kag.interface import LLMClient
 from kag.solver.tools.info_processor import ReporterIntermediateProcessTool
 
 from kag.common.conf import KAG_CONFIG, KAG_PROJECT_CONF
@@ -36,8 +36,10 @@ class SolverMain:
             host_addr=host_addr,
             language=KAG_PROJECT_CONF.language,
         )
+
+        llm_client: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["llm"])
         solver = FinStateSolver(
-            report_tool=report_tool, KAG_PROJECT_ID=project_id
+            report_tool=report_tool, KAG_PROJECT_ID=project_id, llm_client=llm_client
         )
         answer = solver.run(query, report_tool=report_tool, session_id=session_id)
         return answer
