@@ -114,6 +114,15 @@ class ReporterIntermediateProcessTool:
         """
         return f"子问题{index}" if self.language == "zh" else f"Sub Question {index}"
 
+    def report_ca_pipeline(self, ca_pipeline: CaPipeline):
+        request = ReportPipelineRequest(task_id=self.task_id, pipeline=ca_pipeline)
+        if self.report_log:
+            self.client.reasoner_dialog_report_pipeline_post(
+                report_pipeline_request=request
+            )
+        else:
+            logger.info(request)
+
     def report_pipeline(self, question, rewrite_question_list: List[LFPlan] = []):
         """
         Report the entire pipeline including nodes and edges.

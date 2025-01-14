@@ -36,73 +36,14 @@ class SolverMain:
             host_addr=host_addr,
             language=KAG_PROJECT_CONF.language,
         )
-        llm_client = KAG_CONFIG.all_config["llm"]
-        default_pipeline_config = {
-            "max_iterations": 3,
-            "memory": {"type": "default_memory", "llm_client": llm_client},
-            "generator": {
-                "generate_prompt": {"type": "default_resp_generator"},
-                "llm_client": llm_client,
-                "type": "default_generator",
-            },
-            "reasoner": {
-                "lf_executor": {
-                    "chunk_retriever": {
-                        "recall_num": 10,
-                        "rerank_topk": 10,
-                        "type": "default_chunk_retriever",
-                        "llm_client": llm_client,
-                    },
-                    "exact_kg_retriever": {
-                        "el_num": 5,
-                        "graph_api": {"type": "openspg_graph_api"},
-                        "search_api": {"type": "openspg_search_api"},
-                        "type": "default_exact_kg_retriever",
-                        "llm_client": llm_client,
-                    },
-                    "force_chunk_retriever": True,
-                    "fuzzy_kg_retriever": {
-                        "el_num": 5,
-                        "graph_api": {"type": "openspg_graph_api"},
-                        "search_api": {"type": "openspg_search_api"},
-                        "type": "default_fuzzy_kg_retriever",
-                        "llm_client": llm_client,
-                    },
-                    "merger": {
-                        "chunk_retriever": {
-                            "recall_num": 10,
-                            "rerank_topk": 10,
-                            "llm_client": llm_client,
-                            "type": "default_chunk_retriever",
-                        },
-                        "type": "default_lf_sub_query_res_merger",
-                    },
-                    "llm_client": llm_client,
-                    "type": "default_lf_executor",
-                },
-                "lf_planner": {
-                    "type": "default_lf_planner",
-                    "llm_client": llm_client,
-                },
-                "llm_client": llm_client,
-                "type": "default_reasoner",
-            },
-            "reflector": {"type": "default_reflector", "llm_client": llm_client},
-        }
-        conf = copy.deepcopy(
-            KAG_CONFIG.all_config.get("lf_solver_pipeline", default_pipeline_config)
-        )
         solver = FinStateSolver(
             report_tool=report_tool, KAG_PROJECT_ID=project_id
         )
         answer = solver.run(query, report_tool=report_tool, session_id=session_id)
-        report_tool.report_final_answer(
-            query, answer, ReporterIntermediateProcessTool.STATE.FINISH
-        )
         return answer
 
 
 if __name__ == "__main__":
-    res = SolverMain().invoke(300027, 2800106, "who is Jay Zhou", True)
+    res = SolverMain().invoke(1, 1, 1, "who is Jay Zhou", True)
     print("*" * 80)
     print("The Answer is: ", res)

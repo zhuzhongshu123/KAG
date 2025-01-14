@@ -16,7 +16,7 @@ class FinStateSolver(SolverPipeline):
         from kag.common.conf import KAG_CONFIG
         KAG_CONFIG.all_config["chat_llm"]
         llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
-        self.table_reasoner = TableReasoner(llm_module = llm)
+        self.table_reasoner = TableReasoner(llm_module = llm, **kwargs)
 
     def run(self, question, **kwargs):
         """
