@@ -162,8 +162,6 @@ kag_solver_pipeline:
   generator:
     type: default_generator # kag.solver.implementation.default_generator.DefaultGenerator
     llm_client: *chat_llm
-    generate_prompt:
-      type: resp_simple # kag/examples/hotpotqa/solver/prompt/resp_generator.py
   reflector:
     type: default_reflector # kag.solver.implementation.default_reflector.DefaultReflector
     llm_client: *chat_llm
