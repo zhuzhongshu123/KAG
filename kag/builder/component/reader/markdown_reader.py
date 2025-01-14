@@ -23,6 +23,7 @@ import pandas as pd
 from typing import List, Dict
 
 
+from kag.common.utils import generate_hash_id
 from kag.interface import ReaderABC
 from kag.builder.model.chunk import Chunk, ChunkTypeEnum
 from kag.interface import LLMClient
@@ -302,7 +303,7 @@ class MarkDownReader(ReaderABC):
                 all_content.extend(child_content)
 
             current_output = Chunk(
-                id=f"{id}_{len(outputs)}",
+                id=f"{generate_hash_id(full_title)}",
                 parent_id=parent_id,
                 name=full_title,
                 content="\n".join(filter(None, all_content)),
@@ -374,7 +375,7 @@ class MarkDownReader(ReaderABC):
                     all_content.extend(child_content)
 
                 current_output = Chunk(
-                    id=f"{id}_{len(outputs)}",
+                    id=f"{generate_hash_id(full_title)}",
                     parent_id=parent_id,
                     name=full_title,
                     content="\n".join(filter(None, all_content)),
