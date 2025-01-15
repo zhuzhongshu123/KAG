@@ -72,7 +72,11 @@ class TableRetrievalAgent(ChunkRetriever):
         # self.retravel_gen_symbol = PromptABC.from_config({"type": "retravel_gen_symbol"})
         self.retravel_gen_symbol = RetrivalGenerateSymbolPrompt(language=self.language)
 
-        self.llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
+        if "llm" in KAG_CONFIG.all_config:
+            llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["llm"])
+        else:
+            llm: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["chat_llm"])
+        self.llm = llm
 
         self.text_similarity = TextSimilarity()
         self.fuzzy_match = FuzzyMatchRetrieval(
@@ -85,7 +89,7 @@ class TableRetrievalAgent(ChunkRetriever):
         entities = self.chunk_retriever.named_entity_recognition(query=ner_query)
         all_entities = set()
         for entity in entities:
-            all_entities.add(entity["entity"])
+            all_entities.add(entity["name"])
             for i, alias in enumerate(entity["alias"]):
                 if i <= 1:
                     all_entities.add(alias)

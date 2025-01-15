@@ -43,11 +43,10 @@ def buildChunkKB(file_path):
     logger.info(f"\n\nbuildChunkKB successfully for {file_path}\n\n")
 
 if __name__ == "__main__":
-    clear_neo4j_data("finstate")
     import_modules_from_path(
-        os.path.join(os.path.abspath(os.path.dirname(__file__)), "../builder_component")
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), "../../builder_component")
     )
     dir_path = os.path.dirname(__file__)
-    file_path = os.path.join(dir_path, "data/阿里巴巴2025财年度中期报告-1.md")
+    file_path = os.path.join(dir_path, "../../builder/data/阿里巴巴2025财年度中期报告.md")
 
     buildChunkKB(file_path)

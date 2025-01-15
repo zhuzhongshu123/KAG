@@ -17,7 +17,7 @@ from typing import List, Optional
 from kag.interface.common.prompt import PromptABC
 from knext.reasoner.client import ReasonerClient
 
-@PromptABC.register("question_ner")
+@PromptABC.register("table_question_ner")
 class QuestionNER(PromptABC):
 
     template_en = """
@@ -30,7 +30,7 @@ class QuestionNER(PromptABC):
       "input": "查找阿里巴巴各部分收入",
       "output": [
         {
-          "entity": "阿里巴巴",
+          "name": "阿里巴巴",
           "category": "Keyword",
           "alias": [
             "阿里巴巴集团"
@@ -39,7 +39,7 @@ class QuestionNER(PromptABC):
           ]
         },
         {
-          "entity": "收入",
+          "name": "收入",
           "category": "Keyword",
           "alias": [
             "营业收入",

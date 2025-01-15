@@ -26,7 +26,21 @@ $question
 
 # your answer
 """
-    template_en = template_zh
+    template_en = """# task
+The provided information is insufficient to answer the question. Your task is to, based on background knowledge and the user's given question, identify the information that needs to be obtained and potentially provide some related answers based on the existing information.
+# Background Knowledge
+$dk
+
+# output format
+Plain text, do not include markdown formatting.
+
+# context
+$memory
+
+# question
+$question
+
+# your answer"""
 
     def __init__(self, language: str):
         super().__init__(language)

@@ -5,7 +5,11 @@ openie_llm: &openie_llm
   model: deepseek-chat
   type: maas
 
-
+llm: &llm
+  api_key: sk-4323e7aaab36449fab52b0ed86e29696
+  base_url: https://api.deepseek.com
+  model: deepseek-chat
+  type: maas
 
 chat_llm: &chat_llm
   api_key: sk-4323e7aaab36449fab52b0ed86e29696
@@ -26,11 +30,11 @@ log:
 
 project:
   biz_scene: table
-  host_addr: http://127.0.0.1:8887
-  #host_addr: http://antspg-gz00b-006000164057.sa128-sqa.alipay.net:8887
-  id: '1'
+  #host_addr: http://127.0.0.1:8887
+  host_addr: http://antspg-gz00b-006000164057.sa128-sqa.alipay.net:8887
+  id: '3300002'
   language: zh
-  namespace: FinState
+  namespace: FinStateDemo
 #------------project configuration end----------------#
 
 #------------kag-builder configuration start----------------#
@@ -68,7 +72,7 @@ kag_builder_pipeline:
       vectorize_model: *vectorize_model
     writer:
       type: kg_writer # kag.builder.component.writer.kg_writer.KGWriter
-  num_threads_per_chain: 10
+  num_threads_per_chain: 1
   num_chains: 1
   scanner:
     type: file_scanner # kag.builder.component.scanner.dataset_scanner.HotpotqaCorpusScanner

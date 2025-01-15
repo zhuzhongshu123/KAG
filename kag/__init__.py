@@ -227,3 +227,4 @@ import kag.common.llm
 import kag.common.checkpointer
 import kag.solver
 import kag.bin.commands
+import kag.examples

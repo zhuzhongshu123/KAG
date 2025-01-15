@@ -10,10 +10,5 @@
 # or implied.
 
 """
-Place the prompts to be used for solving problems in this directory.
+Place the prompts to be used for building the index in this directory.
 """
-from kag.examples.FinState.solver.prompt.only_retriever_plan import OnlyRetrieverPlan
-
-__all__ = [
-    "OnlyRetrieverPlan"
-]

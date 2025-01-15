@@ -10,10 +10,11 @@
 # or implied.
 
 """
-Place the prompts to be used for solving problems in this directory.
-"""
-from kag.examples.FinState.solver.prompt.only_retriever_plan import OnlyRetrieverPlan
+Place the DSL file for graph reasoning in this directory.
+For example:
 
-__all__ = [
-    "OnlyRetrieverPlan"
-]
+```company.dsl
+MATCH (s:DEFAULT.Company)
+RETURN s.id, s.address
+```
+"""

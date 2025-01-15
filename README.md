@@ -17,6 +17,9 @@
     <a href="https://github.com/OpenSPG/KAG/releases/latest">
         <img src="https://img.shields.io/github/v/release/OpenSPG/KAG?color=blue&label=Latest%20Release" alt="Latest Release">
     </a>
+    <a href="https://openspg.yuque.com/ndx6g9/docs_en">
+        <img src="https://img.shields.io/badge/User%20Guide-1e8b93?logo=readthedocs&logoColor=f5f5f5" alt="User Guide">
+    </a>
     <a href="https://github.com/OpenSPG/KAG/blob/main/LICENSE">
         <img height="21" src="https://img.shields.io/badge/License-Apache--2.0-ffffff?labelColor=d4eaf7&color=2e6cc4" alt="license">
     </a>
@@ -65,12 +68,12 @@ In this process, each step can use different operators, such as exact match retr
 
 ## 3.1 Latest Updates
 
+* 2025.01.07 : Support domain knowledge injection, domain schema customization, QFS tasks support, Visual query analysis, enables schema-constraint mode for extraction, etc.
 * 2024.11.21 : Support Word docs upload, model invoke concurrency setting, User experience optimization, etc.
 * 2024.10.25 : KAG initial release
 
 ## 3.2 Future Plans
 
-* domain knowledge injection, domain schema customization, QFS tasks support, Visual query analysis, etc.
 * Logical reasoning optimization, conversational tasks support
 * kag-model release, kag solution for event reasoning knowledge graph and medical knowledge graph
 * kag front-end open source, distributed build support, mathematical reasoning optimization

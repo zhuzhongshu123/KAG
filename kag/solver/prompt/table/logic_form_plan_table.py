@@ -124,7 +124,58 @@ class LogicFormPlanPrompt(PromptABC):
   "failed_cases": "$history"
 }
 """
-    template_en = template_zh
+    template_en = """{
+"task": "Decompose into Sub-Questions",
+"instruction": [
+"Identify the core key steps to solve the problem and summarize them as sub-questions.",
+"Refer to function capabilities and assign sub-questions to appropriate functions for processing.",
+"Refer to failed attempts in failed_cases, change the approach, try other decomposition methods, and generate new sub-questions!"
+],
+"pay_attention": [
+"Your mathematical calculation abilities are poor; you must use PythonCoder to solve.",
+"The decomposition of sub-questions must be appropriately detailed, and each sub-question can be solved independently; sub-questions must be core key steps, not extremely detailed execution steps.",
+"Descriptions of sub-questions must be complete, without omitting any keywords, with clear semantics for ease of understanding."
+],
+"output_format": [
+"Just Output in JSON format, without any other description after JSON Data, with 'output' providing the list of sub-questions.",
+"Each sub-question includes 'sub_question' and 'process_function'.",
+"The value of 'sub_question' is a string type. Note: Do not include line breaks to avoid JSON format issues.",
+"The value of 'process_function' should be a 'functionName' from 'functions'."
+],
+"functions": [
+{
+  "functionName": "PythonCoder",
+  "description": "Write Python code to solve the given problem.",
+  "pay_attention": "Use only Python's standard libraries.",
+  "examples": [
+    {
+      "input": "Which is larger, 9.8 or 9.11?",
+      "internal_processing_logic": "Write Python code ```python\nanswer = max(9.8, 9.11)\nprint(answer)``` and call the executor to obtain the result.",
+      "output": "9.8"
+    },
+    {
+      "input": "What day of the week is it today?",
+      "internal_processing_logic": "```python\nimport datetime\n\n# Get the current date\ntoday = datetime.datetime.now()\n\n# Format the date to get the day of the week, %A returns the full weekday name\nday_of_week = today.strftime(\"%A\")\n\n# Print the result\nprint(\"Today is:\", day_of_week)\n```",
+      "output": "The example cannot provide an answer; it depends on the specific execution time."
+    }
+  ]
+}
+],
+"examples": [
+{
+  "input": "Find two numbers whose product is 1,038,155 and whose sum is 2,508.",
+  "output": [
+    {
+      "sub_question": "Solve the system of equations to find the numbers that satisfy the conditions: 1. The product of the two numbers is X * Y = 1,038,155. 2. The sum of the two numbers is X + Y = 2,508. Use mathematical methods or programming to calculate the specific values of X and Y.",
+      "process_function": "PythonCoder"
+    }
+  ]
+}
+],
+"input": "$input",
+"failed_cases": "$history"
+}
+"""
 
     def __init__(self, language: str):
         super().__init__(language)
