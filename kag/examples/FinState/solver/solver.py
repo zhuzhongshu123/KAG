@@ -45,6 +45,7 @@ if __name__ == "__main__":
     #question = "李妈妈有12个糖果，她给李明了3个，李红4个，那么李妈妈还剩下多少个糖果？"
     #question1 = "智能信息包括哪些业务"
     #response = solver.run(question)
+    question1 = "生成两个10000000到20000000之间的随机素数，计算他们的乘积"
     response = solver.run(question1)
     print("*" * 80)
     print(question1)
