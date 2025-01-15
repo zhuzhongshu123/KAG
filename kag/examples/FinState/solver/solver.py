@@ -30,7 +30,7 @@ class FinStateSolver(SolverPipeline):
         Returns:
         - tuple: answer, trace log
         """
-        return self.table_reasoner.reason(question, llm_module=None)
+        return self.table_reasoner.reason(question, llm_module=None, **kwargs)
 
 
 if __name__ == "__main__":
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     #question = "公允价值计量表中，24年9月30日，第二级资产各项目哪个占比最高，占了百分之多少？"
     # question = "231243423乘以13334233等于多少？"
     #question = "李妈妈有12个糖果，她给李明了3个，李红4个，那么李妈妈还剩下多少个糖果？"
-    question1 = "智能信息包括哪些业务"
+    #question1 = "智能信息包括哪些业务"
     #response = solver.run(question)
     response = solver.run(question1)
     print("*" * 80)
