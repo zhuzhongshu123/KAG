@@ -27,8 +27,6 @@ from knext.reasoner.rest.models.sub_graph import SubGraph
 logger = logging.getLogger()
 
 
-
-
 def convert_spo_to_graph(graph_id, spo_retrieved):
     nodes = {}
     edges = []
@@ -86,8 +84,7 @@ def update_sub_question_recall_docs(docs):
     return doc_content
 
 
-def convert_lf_res_to_report_format(req_id, index, doc_retrieved, kg_graph: KgGraph
-):
+def convert_lf_res_to_report_format(req_id, index, doc_retrieved, kg_graph: KgGraph):
     context = []
     sub_graph = None
     spo_retrieved = kg_graph.get_all_spo()
@@ -112,9 +109,7 @@ def convert_lf_res_to_report_format(req_id, index, doc_retrieved, kg_graph: KgGr
     return context, sub_graph
 
 
-def _convert_lf_res_to_report_format(
-    req_id, index, doc_retrieved, kg_graph: KgGraph
-):
+def _convert_lf_res_to_report_format(req_id, index, doc_retrieved, kg_graph: KgGraph):
     return convert_lf_res_to_report_format(req_id, index, doc_retrieved, kg_graph)
 
 
@@ -296,7 +291,9 @@ class TableReasoner(KagReasonerABC):
         return sub_question_list
 
     def _call_spo_retravel_func(self, query):
-        pipeline = SolverPipeline.from_config(KAG_CONFIG.all_config["kag_solver_pipeline"])
+        pipeline = SolverPipeline.from_config(
+            KAG_CONFIG.all_config["kag_solver_pipeline"]
+        )
         res: LFExecuteResult = pipeline.reasoner.reason(query)
         history_log = res.get_trace_log()
         context = []
@@ -318,17 +315,19 @@ class TableReasoner(KagReasonerABC):
         cur_content, sub_graph = _convert_lf_res_to_report_format(
             req_id=f"graph_{generate_random_string(3)}",
             index=0,
-            doc_retrieved=history_log['rerank docs'],
-            kg_graph=res.retrieved_kg_graph
+            doc_retrieved=history_log["rerank docs"],
+            kg_graph=res.retrieved_kg_graph,
         )
         context += cur_content
 
-        history_log['report_info'] = {
-            'context': context,
-            'sub_graph': [sub_graph] if sub_graph else None
-
+        history_log["report_info"] = {
+            "context": context,
+            "sub_graph": [sub_graph] if sub_graph else None,
         }
-        if res.sub_plans[-1].res.sub_answer is not None and res.sub_plans[-1].res.sub_answer != "":
+        if (
+            res.sub_plans[-1].res.sub_answer is not None
+            and res.sub_plans[-1].res.sub_answer != ""
+        ):
             answer = res.sub_plans[-1].res.sub_answer
         else:
             answer = "I don't know"
@@ -337,9 +336,31 @@ class TableReasoner(KagReasonerABC):
     def _call_retravel_func(
         self, init_question, node: SearchTreeNode, history: SearchTree
     ):
-        table_retrical_agent = TableRetrievalAgent(
+        # 将前面最多三个子问题的答案拼接到当前子问题上
+        qa_node_list = []
+        prev_node_list = [node]
+        while len(prev_node_list) > 0 and len(qa_node_list) < 3:
+            prev_node = prev_node_list.pop(0)
+            parent_node_list = history.get_parent_nodes(prev_node)
+            if len(parent_node_list) <= 0:
+                break
+            for parent_node in parent_node_list:
+                parent_node: SearchTreeNode = parent_node
+                if parent_node.answer is not None:
+                    prev_node_list.append(parent_node)
+                    qa_node_list.append(parent_node)
+        qa_node_list.reverse()
+        prev_qa_str = ""
+        for qa_node in qa_node_list:
+            prev_qa_str += f"{qa_node.question}\n{qa_node.answer}\n\n"
+        if len(prev_qa_str) > 0:
+            now_question = f"{prev_qa_str}now_processing_question: {node.question}"
+        else:
+            now_question = node.question
+
+        table_retrical_agent: TableRetrievalAgent = TableRetrievalAgent(
             init_question=init_question,
-            question=node.question,
+            question=now_question,
             dk=history.dk,
             **self.kwargs,
         )
@@ -348,7 +369,7 @@ class TableReasoner(KagReasonerABC):
             # 两路召回同时做符号求解
             futures = [
                 executor.submit(table_retrical_agent.symbol_solver, history=history),
-                executor.submit(self._call_spo_retravel_func, node.question),
+                executor.submit(self._call_spo_retravel_func, now_question),
             ]
 
             # 等待任务完成并获取结果

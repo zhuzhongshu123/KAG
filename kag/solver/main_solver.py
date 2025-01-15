@@ -36,10 +36,8 @@ class SolverMain:
             host_addr=host_addr,
             language=KAG_PROJECT_CONF.language,
         )
-
-        llm_client: LLMClient = LLMClient.from_config(KAG_CONFIG.all_config["llm"])
         solver = FinStateSolver(
-            report_tool=report_tool, KAG_PROJECT_ID=project_id, llm_client=llm_client
+            report_tool=report_tool, KAG_PROJECT_ID=project_id
         )
         answer = solver.run(query, report_tool=report_tool, session_id=session_id)
         return answer
