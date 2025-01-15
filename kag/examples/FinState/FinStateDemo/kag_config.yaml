@@ -72,7 +72,7 @@ kag_builder_pipeline:
       vectorize_model: *vectorize_model
     writer:
       type: kg_writer # kag.builder.component.writer.kg_writer.KGWriter
-  num_threads_per_chain: 1
+  num_threads_per_chain: 20
   num_chains: 1
   scanner:
     type: file_scanner # kag.builder.component.scanner.dataset_scanner.HotpotqaCorpusScanner
