@@ -82,7 +82,7 @@ Here is my table data:
             raise ValueError(
                 "unrecognized response format, should provide `Answer:` section"
             )
-        return response.split("Answer: ")[1]
+        return response.split("Answer: ")[1], 0
 
 
 class CodeSolver:
@@ -162,12 +162,12 @@ Here is my table data:
             with open(file_path, "w") as writer:
                 writer.write(json.dumps(data["support_doc"], ensure_ascii=False))
             output = self.run_python_code(function_code, file_path)
-            return output
+            return output, 0
         except:
             if "**Answer**: " in response:
-                return response.split("**Answer**: ")[1]
+                return response.split("**Answer**: ")[1], 1
             elif "Answer: " in response:
-                return response.split("Answer: ")[1]
+                return response.split("Answer: ")[1], 1
             else:
                 raise ValueError(
                     f"Both the Python code and the LLM reasoning failed to answer the question."
@@ -279,9 +279,13 @@ def qa(llm_client, data):
     data_id = data["id"]
     question = data["question"]
     response = llm_client(prompt)
-    # print(f"response = {response}")
-    answer = solver.parse_response(response, data)
-    print(f"answer = {answer}")
+    print(f"response = {response}")
+    answer, source = solver.parse_response(response, data)
+    print(f"answer = {answer, source}")
+
+    if not isinstance(answer, list):
+        answer = [answer]
+
     return (
         data_id,
         {
@@ -290,6 +294,7 @@ def qa(llm_client, data):
             "answer": answer,
             "input": prompt,
             "output": response,
+            "source": source,
         },
     )
 
@@ -326,6 +331,8 @@ def main():
             data_id, answer_dict = result
             ckpt.write_to_ckpt(data_id, answer_dict)
             success += 1
+        else:
+            print(f"invalide result encounted==================")
     print(f"Done process all records, total: {len(data)}, success: {success}.")
 
     gold_answer_path = "data/src/gold_answer/WTQ.json"
@@ -339,15 +346,22 @@ def main():
     gold_test = {}
     for k in ckpt.keys():
         answer = ckpt.read_from_ckpt(k)
+        answers.append(answer)
         data_id = answer["id"]
         label = gold.get(data_id, None)
         answer["gold_answer"] = label
-        pred_test[data_id] = (
-            answer["answer"]
-            if isinstance(answer["answer"], list)
-            else [answer["answer"]]
-        )
-        answers.append(answer)
+        ori_answer = answer["answer"]
+        if not isinstance(ori_answer, list):
+            ori_answer = [ori_answer]
+        processed_answer = []
+        for item in ori_answer:
+            if not isinstance(item, str):
+                item = str(item)
+            if "Answer:" in item:
+                item = item.split("Answer:")[1]
+            processed_answer.append(item)
+        pred_test[data_id] = processed_answer
+
         if k in gold:
             gold_test[k] = gold[k]
     with open("answer.json", "w") as writer:
@@ -362,13 +376,14 @@ def main():
     table_data = [[item[key] for key in keys_to_print] for item in incorrect]
 
     # 打印表格
-    print(
-        tabulate(table_data, headers=keys_to_print, tablefmt="html", maxcolwidths=100)
-    )
 
     print(f"score = {macro_f1}")
 
     CheckpointerManager.close()
+
+    print(
+        tabulate(table_data, headers=keys_to_print, tablefmt="html", maxcolwidths=100)
+    )
 
 
 if __name__ == "__main__":
