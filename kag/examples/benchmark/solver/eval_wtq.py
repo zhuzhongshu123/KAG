@@ -53,16 +53,62 @@ class MySubprocessInterpreter(SubprocessInterpreter):
         return exec_result
 
 
+class TableProcess:
+    def __init__(self):
+        self.prompt = """
+I have a reading comprehension task in which each question is associated with a Wikipedia table. The table is given in the format of a list of python dicts, where each dict represents a row in the table, and the dict's keys and values correspond to the cell titles and their respective values.Please standardize the cell data as follows:
+
+1. For dates, standardize to the "%Y-%m-%d" format, such as "2023-10-05". If the year is not provided, default to 2025.
+2. For times, standardize to the "%H:%M:%S" format, such as "14:15:16". If seconds are not provided, default to 00.
+3. For numbers, parse them into numerical form in JSON format, do not use strings. For example, convert "2,000" to 2000.
+
+You need to output the formatted table data in JSON format, still using a list of dictionaries, WITHOUT adding any additional content.
+        
+Here is my table data:
+{}
+        
+        """
+
+    def render_template(self, data):
+        table = data["support_doc"]
+        return self.prompt.format(table)
+
+    def parse_response(self, response):
+        _end = response.rfind("```")
+        _start = response.find("```json")
+        if _end != -1 and _start != -1:
+            json_str = response[_start + len("```json") : _end].strip()
+        else:
+            json_str = response
+        return json.loads(json_str)
+
+    def process(self, llm_client, data):
+        try:
+            prompt = self.render_template(data)
+            print(f"tabel process prompt:\n{prompt}")
+            response = llm_client(prompt)
+            output = self.parse_response(response)
+            print(f"tabel process output:\n{output}")
+            return output
+        except Exception as e:
+            print(f"failed to preprocess table data")
+            import traceback
+
+            traceback.print_exc()
+            return data["support_doc"]
+
+
 class Solver:
     def __init__(self):
         self.prompt = """
 I have a reading comprehension task in which each question is associated with a Wikipedia table. The table is given in the format of a list of dicts, where each dict represents a row in the table, and the dict's keys and values correspond to the cell titles and their respective values. Accurately answering these questions requires performing various calculations on the table data, such as table lookup, aggregation, comparison (maximum, minimum), arithmetic operations, joins, and unions. Please follow these steps to provide the answer:
 
-1. Identify all rows and columns in the table that are helpful for answering the question.
-2. Determine the series of calculation operations that need to be performed on the table to answer the question.
-3. Execute the calculations identified in step two on the table data and provide the answer.
+1. 
+2. Identify all rows and columns in the table that are helpful for answering the question.
+3. Determine the series of calculation operations that need to be performed on the table to answer the question.
+4. Execute the calculations identified in step two on the table data and provide the answer.
 
-!!!IMPORTANT: You must conclude you response with "Answer: " to present a concise, definitive response, devoid of additional elaboration in step 3. Acceptable formats such as "Answer: 14 May", "Answer: 1832" or "Answer: yes". THE SHORTER, THE BETTER!!!
+!!!IMPORTANT: You must conclude you response with "Answer Is: " to present a concise, definitive response, devoid of additional elaboration in step 3. Acceptable formats such as "Answer Is: 14 May", "Answer Is: 1832" or "Answer Is: yes". THE SHORTER, THE BETTER!!!
 
 
 Here is my question:
@@ -78,11 +124,13 @@ Here is my table data:
         return self.prompt.format(question, table)
 
     def parse_response(self, response, data):
-        if "Answer:" not in response:
+        if "Answer Is" not in response:
             raise ValueError(
-                "unrecognized response format, should provide `Answer:` section"
+                "unrecognized response format, should provide `Answer Is:` section"
             )
-        return response.split("Answer: ")[1], 0
+        return [
+            response.split("Answer Is")[1].replace(":", "").replace("*", "").strip()
+        ]
 
 
 class CodeSolver:
@@ -113,13 +161,19 @@ I have a reading comprehension task in which each question is associated with a 
 2. Plan: Determine the series of calculation operations that need to be performed on the table to answer the question.
 3. Reason: Execute the calculations identified in step two on the table data and provide the answer.
 4. Verify: Write a Python function that takes a JSON file path as input, which stores the content of a data table, and outputs the answer to the question. Your code must ensure that the function syntax is correct and callable, and all necessary dependencies are imported. Additionally, only generate the function code, do not generate the calling code. Following is an example:
-5. Answer: Based on above steps, conclude you response with "Answer: " to present a concise, definitive response, devoid of additional elaboration. Acceptable formats such as "Answer: 14 May", "Answer: 1832" or "Answer: yes". THE SHORTER, THE BETTER!!!
 
 
 def func(table_file: str):
     table=json.load(open(table_file, "r"))
-    # implement your solution here, please add necessary comments.
+
+    # implement your solution here, please add necessary comments. 
+    # Note: please use the datetime package to parse the date and time with %Y-%m-%d and %H:%M:%S format, respectively.
+
     pass
+
+
+5. Answer: Based on above steps, conclude you response with "Answer Is: " to present a concise, definitive response, devoid of additional elaboration. Acceptable formats such as "Answer Is: 14 May" or "Answer Is: 1832". THE SHORTER, THE BETTER!!!
+
 
 Here is my question:
 {}
@@ -138,7 +192,6 @@ Here is my table data:
             return None
 
     def run_python_code(self, function_code, file_path):
-
         intp = MySubprocessInterpreter(require_confirm=False)
         execute_code = f"print(func('{file_path}'))"
         code = f"{function_code}\n{execute_code}"
@@ -154,28 +207,81 @@ Here is my table data:
         return self.prompt.format(question, table)
 
     def parse_response(self, response, data):
-
+        reason_answer = None
+        code_answer = None
         try:
             function_code = self.extract_python_code(response)
             data_id = data["id"]
             file_path = f"tmp/{data_id}.json"
             with open(file_path, "w") as writer:
                 writer.write(json.dumps(data["support_doc"], ensure_ascii=False))
-            output = self.run_python_code(function_code, file_path)
-            return output, 0
+            code_answer = self.run_python_code(function_code, file_path)
         except:
-            if "**Answer**: " in response:
-                return response.split("**Answer**: ")[1], 1
-            elif "Answer: " in response:
-                return response.split("Answer: ")[1], 1
-            else:
-                raise ValueError(
-                    f"Both the Python code and the LLM reasoning failed to answer the question."
-                )
+            pass
+
+        if "Answer Is" in response:
+            reason_answer = (
+                response.split("Answer Is")[1].replace(":", "").replace("*", "").strip()
+            )
+        candidate_answers = []
+        if reason_answer is not None:
+            candidate_answers.append(reason_answer)
+        if code_answer is not None:
+            candidate_answers.append(code_answer)
+        if len(candidate_answers) == 0:
+            raise ValueError(f"No answer found!!!")
+        return list(set(candidate_answers))
+
+
+class AnswerPick:
+    def __init__(self):
+        self.prompt = """
+I have a reading comprehension task in which each question is associated with a Wikipedia table. The table is given in the format of a list of python dicts, where each dict represents a row in the table, and the dict's keys and values correspond to the cell titles and their respective values. Please analyze the candidate answers based on the question and the table data step by step, and then select the correct one from the candidate answers as the final answer.
+
+!!!IMPORTANT: You must provide the reasoning behind your decision, and then conclude you response with "Answer Is: " to present a concise, definitive response, devoid of additional elaboration. Acceptable final answer formats such as "Answer Is: 14 May", "Answer Is: 1832" or "Answer Is: yes". THE SHORTER, THE BETTER!!!
+
+Here is my question:
+{}
+
+Here is my table data:
+{}
+
+Here is my candidate answers:
+{}
+        
+        """
+
+    def render_template(self, data, candidate_answers):
+        question = data["question"]
+        table = data["support_doc"]
+        return self.prompt.format(question, table, candidate_answers)
+
+    def parse_response(self, response):
+        if "Answer Is" not in response:
+            raise ValueError(
+                "unrecognized response format, should provide `Answer Is` section"
+            )
+        return [
+            response.split("Answer Is")[1].replace(":", "").replace("*", "").strip()
+        ]
+
+    def pick(self, llm_client, data, candidate_answers):
+        prompt = self.render_template(data, candidate_answers)
+        print(f"answer pick prompt:\n{prompt}")
+        response = llm_client(prompt)
+        output = self.parse_response(response)
+        print(f"answer pick output:\n{output}")
+        return output
+
+
+def processing_phrases(phrase):
+    phrase = str(phrase)
+    return re.sub("[^A-Za-z0-9]", "", phrase.lower())
 
 
 def calculate_precision_recall_f1(prediction, label):
-
+    prediction = [processing_phrases(x) for x in prediction]
+    label = [processing_phrases(x) for x in label]
     TP = len(set(prediction) & set(label))
     FP = len(set(prediction) - set(label))
     FN = len(set(label) - set(prediction))
@@ -272,6 +378,8 @@ def load_data(file_path):
 
 @retry(stop=stop_after_attempt(3))
 def qa(llm_client, data):
+    processed_table = TableProcess().process(llm_client, data)
+    data["supporting_docs"] = processed_table
     # solver = Solver()
     solver = CodeSolver()
     prompt = solver.render_template(data)
@@ -279,22 +387,29 @@ def qa(llm_client, data):
     data_id = data["id"]
     question = data["question"]
     response = llm_client(prompt)
-    print(f"response = {response}")
-    answer, source = solver.parse_response(response, data)
-    print(f"answer = {answer, source}")
+    answer = solver.parse_response(response, data)
 
     if not isinstance(answer, list):
         answer = [answer]
+
+    ori_answer = answer
+    if len(answer) > 1:
+        ap = AnswerPick()
+        final_answer = ap.pick(llm_client, data, ori_answer)
+    else:
+        print(f"ori_answer = {ori_answer}, skip answer pick")
+        final_answer = ori_answer
 
     return (
         data_id,
         {
             "id": data_id,
             "question": question,
-            "answer": answer,
+            "answer": final_answer,
             "input": prompt,
             "output": response,
-            "source": source,
+            "processed_table": processed_table,
+            "ori_answer": ori_answer,
         },
     )
 
@@ -312,6 +427,7 @@ def main():
     llm_client = get_llm_client()
     data = load_data(file_path)
     print(f"llm_client = {llm_client}")
+    print(llm_client("who are you?!"))
     futures = []
     with ThreadPoolExecutor(16) as executor:
         for item in data:
@@ -346,7 +462,6 @@ def main():
     gold_test = {}
     for k in ckpt.keys():
         answer = ckpt.read_from_ckpt(k)
-        answers.append(answer)
         data_id = answer["id"]
         label = gold.get(data_id, None)
         answer["gold_answer"] = label
@@ -357,13 +472,19 @@ def main():
         for item in ori_answer:
             if not isinstance(item, str):
                 item = str(item)
-            if "Answer:" in item:
-                item = item.split("Answer:")[1]
+            if "Answer Is" in item:
+                item = (
+                    item.split("Answer Is")[1].replace(":", "").replace("*", "").strip()
+                )
+
             processed_answer.append(item)
         pred_test[data_id] = processed_answer
 
         if k in gold:
             gold_test[k] = gold[k]
+        answer["answer"] = processed_answer
+        answers.append(answer)
+
     with open("answer.json", "w") as writer:
         writer.write(json.dumps(answers, indent=4, ensure_ascii=False))
     macro_f1, f1_list = get_score(gold_test, pred_test)
